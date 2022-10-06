@@ -40,19 +40,17 @@ int main()
 	// Communicate with server continuously
 	while (1){
 		bzero(buffer,sizeof(buffer));
-		printf("Enter a message: ");
+		printf("ftp> ");
 		fgets(buffer, sizeof(buffer), stdin);
 		buffer[strcspn(buffer, "\n")] = 0;
 		
 		int send_bytes = send(server_sd, buffer, strlen(buffer), 0);
 
-		if (strcmp(buffer, "BYE!")==0) break; // Stop communicating if "BYE!" is typed
-
 		bzero(buffer,sizeof(buffer));
 		int recv_bytes = recv(server_sd, buffer, sizeof(buffer), 0);
 		printf("Received Message: %s\n", buffer);
 
-		if (recv_bytes==0) break; // Stop communicating if the server returns no bytes. Could show server is no longer running
+		// if (recv_bytes==0) break; // Stop communicating if the server returns no bytes. Could show server is no longer running
 	}
 	close(server_sd);
 }

@@ -7,10 +7,20 @@
 #include<unistd.h>
 #include<stdlib.h>
 
+#define DEBUG 1
+
+#include "server_input.h"
+#include "server_users.h"
+
 // Code template from: rn3_simple_server_updated.c by Rohail Asim
 
 int main()
 {
+	if (readUsers()!=1){
+		printf("Error in reading users.txt");
+	}
+	free(users);
+	return 0;
 	//socket
 	int server_sd = socket(AF_INET,SOCK_STREAM,0);
 	if(server_sd<0)
@@ -76,7 +86,7 @@ int main()
 				printf("[%s:%d]: ",inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 				printf("Send Message: %s\n",buffer);
 
-			} while (strcmp(buffer, "BYE!")!=0); // exit if client types "BYE!""
+			} while (strcmp(buffer, "QUIT!")!=0); // exit if client types "BYE!""
 			break;
 		} else {
 			close(client_sd);  //close the copy of client/secondary socket in parent process

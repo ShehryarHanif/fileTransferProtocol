@@ -1,0 +1,26 @@
+PLAN:
+
+1. Implement User Authentication System using users.txt
+--- Probably just create structs to store users and then store all users in array
+--- Or whenver user logins, scan through file
+--- Both works ig
+
+2. Decide on structure of file
+--- A lot of complex functions at work here
+--- Need to neatly compartmentalize them
+
+Modules/Parts Needed for Server:
+a) Connection Creation/Handling (the core component)c
+b) Reading and disecting user input
+c) User Authentication module
+d) Command Handler
+e) Commands Modules
+f) Data transfer part/module
+
+Modules/Parts Needed for Server:
+a) Connection Creation/Handling (the core component)
+b) Reading and disecting user input
+c) Commands Modules (for ! commands)
+d) Command Handler
+
+3. Each data file transfer is done on a different port -> Select/Fork every time
