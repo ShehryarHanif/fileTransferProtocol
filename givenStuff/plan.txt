@@ -9,18 +9,22 @@ PLAN:
 --- A lot of complex functions at work here
 --- Need to neatly compartmentalize them
 
+* = to do next
+** = done
+
+
 Modules/Parts Needed for Server:
-a) Connection Creation/Handling (the core component)c
-b) Reading and disecting user input
-c) User Authentication module
-d) Command Handler
-e) Commands Modules
+a) Connection Creation/Handling (the core component)
+---- Convert fork to connect *
+b) Reading and disecting user input  *
+c) User Authentication module**
+d) Command Handler and Commands Modules
 f) Data transfer part/module
 
 Modules/Parts Needed for Server:
 a) Connection Creation/Handling (the core component)
-b) Reading and disecting user input
-c) Commands Modules (for ! commands)
-d) Command Handler
+---- Receiving FTP files
+b) Reading and disecting user input *
+c) Commands Modules (for ! commands) and Command Handler
 
 3. Each data file transfer is done on a different port -> Select/Fork every time
