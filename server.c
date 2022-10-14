@@ -9,17 +9,28 @@
 
 #define DEBUG 1
 
+#include "server_state.h"
 #include "server_input.h"
 #include "server_users.h"
+
+#include "server_commands.h"
 
 // Code template from: rn3_simple_server_updated.c by Rohail Asim
 
 int main()
 {
-	if (readUsers()!=1){
-		printf("Error in reading users.txt");
-	}
-	free(users);
+	// if (readUsers()!=1){
+	// 	printf("Error in reading users.txt");
+	// }
+	// free(users);
+	char test[] = "PWD hello";
+	int length = 0;
+	char** input = splitString(test, &length);
+	for (int i = 0; i < 5+1; i++){
+        printf("%d: %s\n", i, input[i]);
+    }
+	printf("Length: %d\n", length);
+	selectCommand(input);
 	return 0;
 	//socket
 	int server_sd = socket(AF_INET,SOCK_STREAM,0);

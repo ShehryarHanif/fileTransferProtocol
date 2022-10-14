@@ -37,6 +37,7 @@ int readUsers(){
     for(int i = 0; i < numberUsers; i++) {
         int scanned = fscanf(fp, "%255s %255s\n", user_buff, pass_buff);
         if (scanned < 2){
+            free(users);
             return 0; // Error in file reading or Error in users.txt
         }
         if(DEBUG) printf("Read User: %s, Pass: %s\n", user_buff, pass_buff);
@@ -52,6 +53,7 @@ int readUsers(){
 
     if(DEBUG) printf("===================\n");
     
+    free(users);
     return 1;
 }
 
