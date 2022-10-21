@@ -7,6 +7,9 @@
 #include<unistd.h>
 #include<stdlib.h>
 
+#include "server_input.h"
+#include "client_commands.h"
+
 
 // Code template from: rn3_simple_client.c by Rohail Asim
 
@@ -43,6 +46,12 @@ int main()
 		printf("ftp> ");
 		fgets(buffer, sizeof(buffer), stdin);
 		buffer[strcspn(buffer, "\n")] = 0;
+		if (isLocalCommand(buffer)){
+			int length = 0;
+			char** input = splitString(buffer, &length);
+			selectCommand(input, length);
+			continue;
+		}
 		
 		int send_bytes = send(server_sd, buffer, strlen(buffer), 0);
 

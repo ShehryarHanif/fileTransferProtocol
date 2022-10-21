@@ -23,15 +23,15 @@ int main()
 	// 	printf("Error in reading users.txt");
 	// }
 	// free(users);
-	char test[] = "PWD hello";
-	int length = 0;
-	char** input = splitString(test, &length);
-	for (int i = 0; i < 5+1; i++){
-        printf("%d: %s\n", i, input[i]);
-    }
-	printf("Length: %d\n", length);
-	selectCommand(input);
-	return 0;
+	// char test[] = "PWD hello";
+	// int length = 0;
+	// char** input = splitString(test, &length);
+	// for (int i = 0; i < 5+1; i++){
+    //     printf("%d: %s\n", i, input[i]);
+    // }
+	// printf("Length: %d\n", length);
+	// selectCommand(input, length,);
+	// return 0;
 	//socket
 	int server_sd = socket(AF_INET,SOCK_STREAM,0);
 	if(server_sd<0)

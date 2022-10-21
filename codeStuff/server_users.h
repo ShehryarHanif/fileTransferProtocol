@@ -19,6 +19,8 @@ int numberUsers; // int to keep track of size of array
 
 // returns 1 if successful
 // returns 0 if not successful
+
+// TODO: Create user folders
 int readUsers(){
     FILE *fp;
     char user_buff[FILE_BUFFER_SIZE];
@@ -38,12 +40,20 @@ int readUsers(){
         int scanned = fscanf(fp, "%255s %255s\n", user_buff, pass_buff);
         if (scanned < 2){
             free(users);
+            printf("Invalid Format of `users.txt`");
             return 0; // Error in file reading or Error in users.txt
         }
         if(DEBUG) printf("Read User: %s, Pass: %s\n", user_buff, pass_buff);
+        if (strlen(user_buff) < MAX_USER_SIZE-1){
+            printf("Invalid user name length. Max Length: %d", MAX_USER_SIZE-1);
+            return 0;
+        }
+        if (strlen(pass_buff) < MAX_USER_SIZE-1){
+            printf("Invalid password length. Max Length: %d", MAX_USER_SIZE-1);
+            return 0;
+        }
         strcpy(users[i].user, user_buff);
         strcpy(users[i].password, pass_buff);
-
     }
     if(DEBUG) printf("===================\nConfirming Read: \n");
 

@@ -28,3 +28,6 @@ b) Reading and disecting user input *
 c) Commands Modules (for ! commands) and Command Handler
 
 3. Each data file transfer is done on a different port -> Select/Fork every time
+
+Extra TODOs:
+- Free all malloc memory
