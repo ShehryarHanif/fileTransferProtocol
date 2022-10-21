@@ -1,6 +1,11 @@
 #define MAX_ARGUMENTS 5
 
 
+void printArray(char** input, int length){
+    for (int i = 0; i < length; i++) {
+        printf("%d: %s\n", i, input[i]);
+    }
+}
 // "PORT 21,21,21,12,21,21"
 // split = ["PORT", "21", "21", "21", "12", "21", "21", NULL];
 
@@ -13,7 +18,6 @@ char** splitString(char buffer[], int* length){
         input[i] = NULL;
     }
 
-    printf("Buffer: %s\n", buffer);
     char* ptr = strtok(buffer," ");
     int i = 0;
     
@@ -25,7 +29,7 @@ char** splitString(char buffer[], int* length){
         i++;
     }
     *length = i;
-
+    // printArray(input, i);
     
     return input;
 }

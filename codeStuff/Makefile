@@ -6,5 +6,5 @@ clean:
 server: server.c server_input.h server_users.h server_commands.h
 	gcc server.c -o server/s
 
-client: client.c
+client: client.c server_input.h client_commands.h client_state.h
 	gcc client.c -o client/c

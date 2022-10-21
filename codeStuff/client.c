@@ -7,6 +7,7 @@
 #include<unistd.h>
 #include<stdlib.h>
 
+#include "client_state.h"
 #include "server_input.h"
 #include "client_commands.h"
 
@@ -30,6 +31,12 @@ int main()
 	server_addr.sin_port = htons(5001);
 	server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
+	struct State state = {""};
+	if(!initializePWD(&state)){
+		perror("Could not initialize state!");
+		return 0;
+	}
+
 	// connecting
     if(connect(server_sd,(struct sockaddr*)&server_addr,sizeof(server_addr))<0)
     {
@@ -41,17 +48,18 @@ int main()
 	char buffer[256];
 
 	// Communicate with server continuously
-	while (1){
+	while (1) {
 		bzero(buffer,sizeof(buffer));
 		printf("ftp> ");
 		fgets(buffer, sizeof(buffer), stdin);
 		buffer[strcspn(buffer, "\n")] = 0;
-		// if (isLocalCommand(buffer)){
-		// 	int length = 0;
-		// 	char** input = splitString(buffer, &length);
-		// 	selectCommand(input, length);
-		// 	continue;
-		// }
+		if (strcmp(buffer, "")==0) continue;
+		if (isLocalCommand(buffer)){
+			int length = 0;
+			char** input = splitString(buffer, &length);
+			selectCommand(input, length, &state);
+			continue;
+		}
 		
 		int send_bytes = send(server_sd, buffer, strlen(buffer), 0);
 
@@ -61,7 +69,7 @@ int main()
 		int recv_bytes = recv(server_sd, buffer, sizeof(buffer), 0);
 		printf("Received Message: %s\n", buffer);
 
-		// if (recv_bytes==0) break; // Stop communicating if the server returns no bytes. Could show server is no longer running
+		if (recv_bytes==0) break; // Stop communicating if the server returns no bytes. Could show server is no longer running
 	}
 	close(server_sd);
 }
