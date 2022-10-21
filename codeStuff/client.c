@@ -46,14 +46,16 @@ int main()
 		printf("ftp> ");
 		fgets(buffer, sizeof(buffer), stdin);
 		buffer[strcspn(buffer, "\n")] = 0;
-		if (isLocalCommand(buffer)){
-			int length = 0;
-			char** input = splitString(buffer, &length);
-			selectCommand(input, length);
-			continue;
-		}
+		// if (isLocalCommand(buffer)){
+		// 	int length = 0;
+		// 	char** input = splitString(buffer, &length);
+		// 	selectCommand(input, length);
+		// 	continue;
+		// }
 		
 		int send_bytes = send(server_sd, buffer, strlen(buffer), 0);
+
+		if (strcmp(buffer, "QUIT!") == 0) break;
 
 		bzero(buffer,sizeof(buffer));
 		int recv_bytes = recv(server_sd, buffer, sizeof(buffer), 0);

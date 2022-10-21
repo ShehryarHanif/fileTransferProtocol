@@ -20,20 +20,6 @@
 
 int main()
 {
-	// if (readUsers()!=1){
-	// 	printf("Error in reading users.txt");
-	// }
-	// free(users);
-	// char test[] = "PWD hello";
-	// int length = 0;
-	// char** input = splitString(test, &length);
-	// for (int i = 0; i < 5+1; i++){
-	//     printf("%d: %s\n", i, input[i]);
-	// }
-	// printf("Length: %d\n", length);
-	// selectCommand(input, length,);
-	// return 0;
-	// socket
 	int server_sd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_sd < 0)
 	{
@@ -86,62 +72,52 @@ int main()
 			return -1;
 		}
 
+		int client_sd;
+		struct sockaddr_in client_addr;
 		for (int fd = 0; fd <= max_fd; fd++)
 		{
+			printf("FD in question: %d\n", fd);
 			if (FD_ISSET(fd, &ready_fdset))
 			{
+				printf("FD Set!: %d\n", fd);
 				if (fd == server_sd)
 				{
-					// accept
-					struct sockaddr_in client_addr;
 					socklen_t slen = sizeof(client_addr);
-
-					int client_sd = accept(server_sd, (struct sockaddr *)&client_addr, &slen);
-
+					client_sd = accept(server_sd, (struct sockaddr *)&client_addr, &slen);
 
 					printf("[%s:%d]: ", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-					printf("Client Connected\n");
+					printf("Client Connected, fd: %d\n", client_sd);
 
 					char buffer[256]; // Buffer to hold communicated data
 
-
-
-					FD_SET(new_fd, &full_fdset);
-					if (new_fd > max_fd)
-						max_fd = new_fd; // Update the max_fd if new socket has higher FD
+					FD_SET(client_sd, &full_fdset);
+					if (client_sd > max_fd){
+						max_fd = client_sd; // Update the max_fd if new socket has higher FD
+						printf("Setup: maxfd: %d\n", max_fd);
+					}
+						
 				}
 				else
 				{
-					do
+					char buffer[4096];
+
+					bzero(buffer, sizeof(buffer)); // Clear values in buffer to 0
+					int recv_bytes = recv(fd, buffer, sizeof(buffer), 0);
+
+					if (recv_bytes == 0)
 					{
-						bzero(buffer, sizeof(buffer)); // Clear values in buffer to 0
+						close(fd); // close the copy of client/secondary socket in parent process
 
-						int recv_bytes = recv(client_sd, buffer, sizeof(buffer), 0);
-						printf("[%s:%d]: ", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-						printf("Received Message: %s\n", buffer);
+						FD_CLR(fd, &full_fdset);
 
-						if (recv_bytes == 0){
-							close(client_sd); // close the copy of client/secondary socket in parent process
+						break; // If no bytes were received, then break loop and end communication
+					}
 
-							FD_CLR(fd, &full_fdset);
-
-							break; // If no bytes were received, then break loop and end communication
-						}
-
-						send(client_sd, buffer, strlen(buffer), 0);
-						printf("[%s:%d]: ", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-						printf("Send Message: %s\n", buffer);
-
-					} while (strcmp(buffer, "QUIT!") != 0); // exit if client types "BYE!""
-
-						// close
-	printf("Disconnected\n");
-	close(server_sd);
-					break;
+					send(fd, buffer, strlen(buffer), 0);
+					printf("Send Message: %s\n", buffer);
 				}
 			}
 		}
 	}
-
-
+	close(server_sd);
 }
