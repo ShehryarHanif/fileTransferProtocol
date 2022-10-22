@@ -31,3 +31,10 @@ c) Commands Modules (for ! commands) and Command Handler
 
 Extra TODOs:
 - Free all malloc memory
+
+
+Questions:
+- How are ports decided (N, N+1, N+2 etc.) for FTP?
+- Can't we let the system decide the port (not use bind)?
+- What is port 21 vs. port 20?
+- Is file transfer blocking for both server and client?

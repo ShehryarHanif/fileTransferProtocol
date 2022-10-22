@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "server_users.h": "c",
-        "server_input.h": "c"
+        "server_input.h": "c",
+        "server_commands.h": "c",
+        "server_state.h": "c"
     }
 }

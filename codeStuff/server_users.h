@@ -9,8 +9,8 @@ int verifyUserExists(char*);
 
 // Function and Variable Declrations
 struct User{
-    char user[FILE_BUFFER_SIZE];
-    char password[FILE_BUFFER_SIZE];
+    char user[MAX_USER_SIZE];
+    char password[MAX_USER_SIZE];
 };
 
 struct User* users; // Array for the users
@@ -22,10 +22,12 @@ int numberUsers; // int to keep track of size of array
 
 // TODO: Create user folders
 int readUsers(){
+    if(DEBUG) printf("Reading...\n");
     FILE *fp;
     char user_buff[FILE_BUFFER_SIZE];
     char pass_buff[FILE_BUFFER_SIZE];
-    if ((fp = fopen("users.txt", "r")) == NULL){
+    if ((fp = fopen("../users.txt", "r")) == NULL){
+        printf("Could not open file/Not Found\n");
         return 0;
     }
     // Get number of users to assign size to the users array
@@ -44,16 +46,16 @@ int readUsers(){
             return 0; // Error in file reading or Error in users.txt
         }
         if(DEBUG) printf("Read User: %s, Pass: %s\n", user_buff, pass_buff);
-        if (strlen(user_buff) < MAX_USER_SIZE-1){
+        if (strlen(user_buff) >= MAX_USER_SIZE-1){
             printf("Invalid user name length. Max Length: %d", MAX_USER_SIZE-1);
             return 0;
         }
-        if (strlen(pass_buff) < MAX_USER_SIZE-1){
+        if (strlen(pass_buff) >= MAX_USER_SIZE-1){
             printf("Invalid password length. Max Length: %d", MAX_USER_SIZE-1);
             return 0;
         }
-        strcpy(users[i].user, user_buff);
-        strcpy(users[i].password, pass_buff);
+        strncpy(users[i].user, user_buff, MAX_USER_SIZE);
+        strncpy(users[i].password, pass_buff, MAX_USER_SIZE);
     }
     if(DEBUG) printf("===================\nConfirming Read: \n");
 
@@ -63,7 +65,6 @@ int readUsers(){
 
     if(DEBUG) printf("===================\n");
     
-    free(users);
     return 1;
 }
 
@@ -79,18 +80,28 @@ int getNumLines(FILE *fp){
     return count;
 }
 
-// Check if user exists
+// Check if user exists, and no other client is connected with that user names
 // returns 1 if exists
 // 0 otherwise
 int verifyUserExists(char* user){
-    for (int i = 0; i < numberUsers; i++)
+    // Checking if username exists
+    for (int i = 0; i < numberUsers; i++){
+        printf("User checking...%s\nWith %s\nPASS %s\n", users[i].user, user, users[i].password);
         if (strcmp(users[i].user, user)==0)
             return 1;
+    }
+        
+            
     return 0;
 }
 
 // Check if the username and password match
 int verifyUserPassword(char* user, char* password){
+    // Checking if another state is logged in using that username
+    for (int i = 0; i < MAX_CLIENTS; i++)
+        if (strncmp(state[i].user, user, MAX_USER_SIZE-1) == 0 && state[i].authenticated == 1)
+            return 0;
+    // Check if the username and password match
     for (int i = 0; i < numberUsers; i++)
         if (strcmp(users[i].user, user)==0)
             return strcmp(users[i].password, password) == 0 ? 1 : 0;

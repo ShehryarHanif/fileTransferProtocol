@@ -1,0 +1,2 @@
+#define CONTROL_PORT 1025
+#define DATA_PORT 1024
