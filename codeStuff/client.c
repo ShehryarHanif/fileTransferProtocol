@@ -7,6 +7,8 @@
 #include<unistd.h>
 #include<stdlib.h>
 
+#define DEBUG 1
+
 #include "globals.h"
 #include "client_state.h"
 #include "server_input.h"
@@ -32,7 +34,7 @@ int main()
 	server_addr.sin_port = htons(CONTROL_PORT);
 	server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-	struct State state = {"","",-1};
+	struct State state = {"","",-1, -1};
 	if(!initializePWD(&state)){
 		perror("Could not initialize state!");
 		return 0;
@@ -45,6 +47,7 @@ int main()
         exit(-1);
     }
 	printf("Connected to server\n");
+	
 	
 	char buffer[4096];
 	struct sockaddr_in client_addr;

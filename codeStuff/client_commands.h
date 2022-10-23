@@ -95,8 +95,9 @@ int list(struct State *state)
     return 1;
 }
 
-int create_socket(struct State *state, int* port, int* ftp_connection)
+int create_socket(struct State *state, int* port, int* ftp_connection, int* ftp_client_connection)
 {
+    if (DEBUG) printf("PORT: Creating Socket...\n");
     int base_port = state->port;
 
     *ftp_connection = socket(AF_INET, SOCK_STREAM, 0);
@@ -108,11 +109,20 @@ int create_socket(struct State *state, int* port, int* ftp_connection)
 
     ftp_connection_addr.sin_port = htons(++base_port);
 
+    if (DEBUG) printf("PORT: Binding...\n");
     while (bind(*ftp_connection, (struct sockaddr *)&ftp_connection_addr, sizeof(ftp_connection_addr)) < 0)
     {
+        // printf("Errno: %d\n", errno);
+        // printf("EACCES : %d\n", EACCES );
+        // printf("EADDRINUSE: %d\n", EADDRINUSE);
+        // printf("Errno: %d\n", errno);
+        // printf("Errno: %d\n", errno);
+        // printf("Errno: %d\n", errno);
+        // printf("Errno: %d\n", errno);
+        strerror(errno);
         if (errno == EADDRINUSE)
         {
-            printf("the port is not available. already to other process\n");
+            printf("PORT: Unavailable Port\n");
             ftp_connection_addr.sin_port = htons(++base_port);
         }
         else
@@ -130,6 +140,11 @@ int create_socket(struct State *state, int* port, int* ftp_connection)
         close(*ftp_connection);
         return 0;
     }
+    // Accept single connection
+	struct sockaddr_in client_addr;
+    socklen_t slen = sizeof(client_addr);
+    ftp_client_connection = accept(*ftp_connection, (struct sockaddr *)&client_addr, &slen);
+    printf("FTP CLIENT ADDRESS: %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
     return 1;
 }
 
@@ -138,8 +153,8 @@ void port(struct State *state, int server_sd)
     // create socket for data transfer
     int port = 0;
     int ftp_connection = 0;
-
-    create_socket(state, &port, &ftp_connection); // get ip address and port
+    int ftp_client_connection = 0;
+    create_socket(state, &port, &ftp_connection, &ftp_client_connection); // get ip address and port
     // convert port and ip addresses to single bytes
     char* h1 = strtok(state->ipaddr, ".");
     char* h2 = strtok(NULL, ".");
@@ -155,7 +170,8 @@ void port(struct State *state, int server_sd)
 
     char buffer[4096];
     bzero(buffer,sizeof(buffer));
-    int recv_bytes = read(server_sd, buffer, sizeof(buffer));
+    int recv_bytes = read(ftp_client_connection, buffer, sizeof(buffer));
+    printf("Received ftp message: %s\nBytes: %d\n", buffer, recv_bytes);
     close(server_sd);
 }
 

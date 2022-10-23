@@ -5,7 +5,12 @@ struct State {
     char pwd[MAX_LINUX_DIR_SIZE]; // present working directory
     char ipaddr[MAX_IPADDRSTR_SIZE]; // remember to use inet_ntoa
     int port;
+    int server_fd;
 };
+
+struct Connection {
+    int 
+}
 
 int initializePWD(struct State* state){
 

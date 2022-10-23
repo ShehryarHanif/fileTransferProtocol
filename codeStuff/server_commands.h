@@ -207,9 +207,10 @@ int openDataConnection(char *address, int length, struct State *state)
         return 0;
     }
     char PORTOK[] = "PORT OK";
-    // send(ftp_connnection, PORTOK, strlen(PORTOK), 0);
+    printf("Sending: %s\nLength: %ld\n", PORTOK, strlen(PORTOK));
+    send(ftp_connection, PORTOK, strlen(PORTOK), 0);
     close(ftp_connection);
-    strncpy(state->msg, PORTOK, strlen(PORTOK));
+    // strncpy(state->msg, PORTOK, strlen(PORTOK));
     // strncpy(state->user, input[1], MAX_USER_SIZE);
 
     return 1;
@@ -233,7 +234,7 @@ void selectCommand(char buffer[], int buffer_size, struct State *state)
         printf("Error: Null Command \n");
         return;
     }
-    if (strcmp(command, "USER") == 0)
+    else if (strcmp(command, "USER") == 0)
     {
         user(input, length, state);
     }
@@ -273,5 +274,6 @@ void selectCommand(char buffer[], int buffer_size, struct State *state)
     }
     else
     {
+        strcpy(state->msg, "No such command");
     }
 }
