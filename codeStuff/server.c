@@ -107,7 +107,9 @@ int main()
 						max_fd = client_sd; // Update the max_fd if new socket has higher FD
 						printf("Setup: maxfd: %d\n", max_fd);
 					}
-						
+					int state_index = fd - initial_max_fd - 1;
+					// `fd - initial_max_fd - 1` represents the index of clients starting from 0
+					state[state_index].client_sd = client_sd;
 				}
 				else
 				{

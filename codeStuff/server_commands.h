@@ -171,6 +171,13 @@ int cwd(char **input, int length, struct State *state)
 int openDataConnection(char *address, int length, struct State *state)
 {
     int ftp_connection = socket(AF_INET, SOCK_STREAM, 0);
+
+    int value = 1;
+    if (setsockopt(ftp_connection, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(int))<0){
+        perror("setsockopt failed");
+        return 0;
+    }
+
     if (ftp_connection < 0)
     {
         perror("socket:");
@@ -201,18 +208,28 @@ int openDataConnection(char *address, int length, struct State *state)
     ftp_connection_client_addr.sin_family = AF_INET;
     ftp_connection_client_addr.sin_port = htons(port);
     ftp_connection_client_addr.sin_addr.s_addr = inet_addr(ipaddr);
+    printf("Connecting on address: %s:%d\n", ipaddr, port);
     if (connect(ftp_connection, (struct sockaddr *)&ftp_connection_client_addr, sizeof(ftp_connection_client_addr)) < 0)
     {
         perror("connect");
+        strcpy(state->msg, "Could not establish FTP connection");
         return 0;
     }
     char PORTOK[] = "PORT OK";
     printf("Sending: %s\nLength: %ld\n", PORTOK, strlen(PORTOK));
-    send(ftp_connection, PORTOK, strlen(PORTOK), 0);
+    // send(state->client_sd, PORTOK, strlen(PORTOK), 0);
+    strcpy(state->msg, PORTOK);
     close(ftp_connection);
-    // strncpy(state->msg, PORTOK, strlen(PORTOK));
-    // strncpy(state->user, input[1], MAX_USER_SIZE);
 
+    return 1;
+}
+
+int stor(struct State *state){
+    // Variable: Ftp_connection variable
+    // Fork
+    strcpy(state->msg, "STOR OK");
+    // Recv File
+    // Close ftp_connection
     return 1;
 }
 
@@ -254,9 +271,10 @@ void selectCommand(char buffer[], int buffer_size, struct State *state)
             strcpy(state->msg, "Problem occured!");
         }
     }
-    // else if (strcmp(command, "STOR") == 0)
-    // {
-    // }
+    else if (strcmp(command, "STOR") == 0)
+    {
+        stor(state);
+    }
     // else if (strcmp(command, "RETR") == 0)
     // {
     // }

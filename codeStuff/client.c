@@ -56,6 +56,7 @@ int main()
 
 	strncpy(state.ipaddr, inet_ntoa(client_addr.sin_addr), MAX_IPADDRSTR_SIZE);
 	state.port = ntohs(client_addr.sin_port);
+	state.server_sd = server_sd;
 	// snprintf(state.port, MAX_PORTSTR_SIZE, "%d", ntohs(client_addr.sin_port));
 	// strncpy(state.port, itoa(ntohs(client_addr.sin_port)), MAX_PORTSTR_SIZE);
 	// printf("[%s:%s]: ",state.ipaddr, state.port); 
@@ -73,7 +74,7 @@ int main()
 		int length = 0;
 		char** input = splitString(buffer, sizeof(buffer), &length);
 
-		if (!selectCommand(input, length, &state, server_sd)) continue; // restart loop if no data needs to be sent to server
+		if (!selectCommand(input, length, &state)) continue; // restart loop if no data needs to be sent to server
 		
 		int send_bytes = send(server_sd, buffer, strlen(buffer), 0);
 

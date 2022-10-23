@@ -8,6 +8,7 @@ struct State {
     char user[MAX_USER_SIZE];
     char msg[MAX_MESSAGE_SIZE];
     int authenticated; // 1 if authenticated; 0 otherwise
+    int client_sd;
 };
 
 struct State state[MAX_CLIENTS];

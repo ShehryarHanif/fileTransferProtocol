@@ -1,2 +1,2 @@
-#define CONTROL_PORT 1025
-#define DATA_PORT 1024
+#define CONTROL_PORT 1026
+#define DATA_PORT 1025

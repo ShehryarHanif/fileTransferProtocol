@@ -31,6 +31,7 @@ c) Commands Modules (for ! commands) and Command Handler
 
 Extra TODOs:
 - Free all malloc memory
+- Check all strtok
 
 
 Questions:
@@ -38,3 +39,6 @@ Questions:
 - Can't we let the system decide the port (not use bind)?
 - What is port 21 vs. port 20?
 - Is file transfer blocking for both server and client?
+- Can 1 client initiate multiple file transfers simultaenously?
+- How server will be concurrent if multiple clients are connected to 20?
+- How to decide client ports from N to N+i since they will likely overlap?
