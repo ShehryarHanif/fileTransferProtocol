@@ -220,7 +220,7 @@ int openDataConnection(char *address, int length, struct State *state)
     // send(state->client_sd, PORTOK, strlen(PORTOK), 0);
     strcpy(state->msg, PORTOK);
     close(ftp_connection);
-
+    printf("Closed Connection!\n");
     return 1;
 }
 
@@ -237,9 +237,7 @@ int stor(struct State *state){
 void selectCommand(char buffer[], int buffer_size, struct State *state)
 {
     int length = 0;
-    printf("Buffer: %s\n", buffer);
     char **input = splitString(buffer, buffer_size, &length);
-    printf("Length: %d\n", length);
     if (length == 0)
         return;
 
@@ -250,6 +248,10 @@ void selectCommand(char buffer[], int buffer_size, struct State *state)
         // handle null
         printf("Error: Null Command \n");
         return;
+    }
+    else if (strcmp(command, "USER") == 0)
+    {
+        user(input, length, state);
     }
     else if (strcmp(command, "USER") == 0)
     {
@@ -268,7 +270,7 @@ void selectCommand(char buffer[], int buffer_size, struct State *state)
     {
         if (!openDataConnection(input[1], length, state))
         {
-            strcpy(state->msg, "Problem occured!");
+            strcpy(state->msg, "Could not succesfully open data connection!");
         }
     }
     else if (strcmp(command, "STOR") == 0)

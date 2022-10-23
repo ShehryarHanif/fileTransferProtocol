@@ -1,6 +1,9 @@
 #include <dirent.h>
 #include <errno.h>
 
+#define MAX_TRIES 100
+#define FTP_ACCEPT_TIMEOUT 3
+
 // check if local command
 int isLocalCommand(char *input)
 {
@@ -99,12 +102,22 @@ int create_socket(struct State *state, int *port, int *ftp_connection)
 {
     if (DEBUG)
         printf("PORT: Creating Socket...\n");
-    int base_port = state->port;
+    int initial_base_port = state->port;
 
     *ftp_connection = socket(AF_INET, SOCK_STREAM, 0);
 
     int value = 1;
-	if (setsockopt(*ftp_connection, SOL_SOCKET, SO_REUSEADDR , &value, sizeof(int))<0){
+    if (setsockopt(*ftp_connection, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(int)) < 0)
+    {
+        perror("setsockopt failed");
+        return 0;
+    }
+
+    struct timeval tv;
+    tv.tv_sec = FTP_ACCEPT_TIMEOUT;
+    tv.tv_usec = 0;
+    if (setsockopt(*ftp_connection, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv) < 0)
+    {
         perror("setsockopt failed");
         return 0;
     }
@@ -114,19 +127,28 @@ int create_socket(struct State *state, int *port, int *ftp_connection)
     ftp_connection_addr.sin_family = AF_INET;
     ftp_connection_addr.sin_addr.s_addr = inet_addr(state->ipaddr);
 
-    ftp_connection_addr.sin_port = htons(++base_port);
+    int base_port = ((initial_base_port + state->displacement - 1025) % 64510) + 1025;
+    state->displacement = (state->displacement % 100) + 1;
+
+    ftp_connection_addr.sin_port = htons(base_port);
 
     if (DEBUG)
         printf("PORT: Binding..., %s:%d\n", state->ipaddr, base_port);
-    while (bind(*ftp_connection, (struct sockaddr *)&ftp_connection_addr, sizeof(ftp_connection_addr)) < 0)
+
+    int tries = 0;
+    while (bind(*ftp_connection, (struct sockaddr *)&ftp_connection_addr, sizeof(ftp_connection_addr)) < 0 && tries < MAX_TRIES)
     {
-        printf("Errno \n");
-        char* error = strerror(errno);
-        
-        printf("Errno Done: %s, %d, %d\n", error,errno, EADDRINUSE);
-        if (errno == EADDRINUSE || errno == EADDRNOTAVAIL)
+
+        if (DEBUG)
+            printf("Errno Numbers: %d\n", errno);
+        if (errno == EADDRINUSE || errno == EADDRNOTAVAIL || errno == EACCES)
         {
             printf("PORT: Unavailable Port %d\n", base_port);
+
+            base_port = ((initial_base_port - 1025 + state->displacement) % 64510) + 1025;
+            state->displacement = (state->displacement % 100) + 1;
+            tries++;
+
             ftp_connection_addr.sin_port = htons(++base_port);
         }
         else
@@ -134,6 +156,12 @@ int create_socket(struct State *state, int *port, int *ftp_connection)
             perror("bind failed");
             return 0;
         }
+    }
+
+    if (tries == MAX_TRIES)
+    {
+        printf("Range of ports allocated for client are not all not available");
+        return 0;
     }
 
     if (DEBUG)
@@ -178,7 +206,12 @@ int port(struct State *state)
 
     struct sockaddr_in client_addr;
     socklen_t slen = sizeof(client_addr);
-    int ftp_client_connection = accept(ftp_connection, (struct sockaddr *)&client_addr, &slen);
+    int ftp_client_connection;
+    if ((ftp_client_connection = accept(ftp_connection, (struct sockaddr *)&client_addr, &slen)) < 0)
+    {
+        close(ftp_connection);
+        return 0;
+    }
     if (DEBUG)
         printf("FTP CLIENT ADDRESS: %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
@@ -188,6 +221,7 @@ int port(struct State *state)
     printf("Received ftp message: %s\nBytes: %d\n", buffer, recv_bytes);
     close(ftp_client_connection);
     close(ftp_connection);
+    printf("Closed Connection!\n");
     return 1;
 }
 
@@ -216,12 +250,14 @@ int selectCommand(char **input, int length, struct State *state)
     else if (strcmp(command, "STOR") == 0)
     {
         // PORT
-        port(state);
+        if (!port(state))
+            return 0;
         return 1;
     }
     else if (strcmp(command, "RETR") == 0)
     {
         // send port command first
+        return 0;
     }
     else
     {

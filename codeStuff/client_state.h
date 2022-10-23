@@ -6,6 +6,7 @@ struct State {
     char ipaddr[MAX_IPADDRSTR_SIZE]; // remember to use inet_ntoa
     int port;
     int server_sd;
+    int displacement;
 };
 
 int initializePWD(struct State* state){

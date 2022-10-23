@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 #define DEBUG 1
-#define MAX_CLIENTS 10
+#define MAX_CLIENTS 5
 
 #include "globals.h"
 #include "server_state.h"
@@ -33,6 +33,15 @@ int main()
 	// setsock
 	int value = 1;
 	setsockopt(server_sd, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(int));
+
+	// setsock for timeout
+	struct timeval tv;
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    if (setsockopt(server_sd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) < 0){
+        perror("setsockopt timeout failed");
+        return 0;
+    }
 
 	// address
 	struct sockaddr_in server_addr;
@@ -81,10 +90,8 @@ int main()
 		struct sockaddr_in client_addr;
 		for (int fd = 0; fd <= max_fd; fd++)
 		{
-			printf("FD in question: %d\n", fd);
 			if (FD_ISSET(fd, &ready_fdset))
 			{
-				printf("FD Set!: %d\n", fd);
 				if (fd == server_sd)
 				{
 					socklen_t slen = sizeof(client_addr);
@@ -97,15 +104,13 @@ int main()
 					}
 					
 
-					printf("[%s:%d]: ", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-					printf("Client Connected, fd: %d\n", client_sd);
+					printf("[%s:%d]: Client Connected, fd: %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), client_sd);
 
 					char buffer[256]; // Buffer to hold communicated data
 
 					FD_SET(client_sd, &full_fdset);
 					if (client_sd > max_fd){
 						max_fd = client_sd; // Update the max_fd if new socket has higher FD
-						printf("Setup: maxfd: %d\n", max_fd);
 					}
 					int state_index = fd - initial_max_fd - 1;
 					// `fd - initial_max_fd - 1` represents the index of clients starting from 0
@@ -121,9 +126,9 @@ int main()
 
 					int recv_bytes = recv(fd, buffer, 4096, 0);
 
-					if (recv_bytes == 0)
+					if (recv_bytes == 0 || strcmp(buffer, "QUIT!") == 0)
 					{
-						// TODO: Refresh state
+						printf("Closing connection to client\n");
 						resetState(&state[state_index]);
 						close(fd); // close the copy of client/secondary socket in parent process
 
@@ -132,13 +137,12 @@ int main()
 						// break; // If no bytes were received, then break loop and end communication
 						continue;
 					}
-					
 					selectCommand(buffer, 4096, &state[state_index]);
 					
 					// send(fd, state[state_index].msg, MAX_MESSAGE_SIZE*sizeof(char), 0);
 					if (strcmp(state[state_index].msg, "")==0) strcpy(state[state_index].msg, " ");
 					write(fd, state[state_index].msg, strlen(state[state_index].msg));
-					if (DEBUG) printf("Send Message: \n%s\n", state[state_index].msg);
+					if (DEBUG) printf("Sent Message: \n%s\n", state[state_index].msg);
 				}
 			}
 		}

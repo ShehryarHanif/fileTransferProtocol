@@ -34,11 +34,20 @@ int main()
 	server_addr.sin_port = htons(CONTROL_PORT);
 	server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-	struct State state = {"","",-1, -1};
+	struct State state = {"","",-1, -1, 1};
 	if(!initializePWD(&state)){
 		perror("Could not initialize state!");
 		return 0;
 	}
+
+	// setsock for timeout
+	struct timeval tv;
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    if (setsockopt(server_sd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) < 0){
+        perror("setsockopt timeout failed");
+        return 0;
+    }
 
 	// connecting
     if(connect(server_sd,(struct sockaddr*)&server_addr,sizeof(server_addr))<0)
@@ -82,7 +91,7 @@ int main()
 
 		bzero(buffer,sizeof(buffer));
 		int recv_bytes = read(server_sd, buffer, sizeof(buffer));
-		printf("Received Message: %s\nRecv Bytes: %d\n", buffer, recv_bytes);
+		printf("\n-------\nReceived Message: %s\nRecv Bytes: %d\n------\n", buffer, recv_bytes);
 
 		if (recv_bytes==0) break; // Stop communicating if the server returns no bytes. Could show server is no longer running
 	}

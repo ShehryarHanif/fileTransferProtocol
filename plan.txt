@@ -35,10 +35,13 @@ Extra TODOs:
 
 
 Questions:
-- How are ports decided (N, N+1, N+2 etc.) for FTP?
-- Can't we let the system decide the port (not use bind)?
-- What is port 21 vs. port 20?
 - Is file transfer blocking for both server and client?
-- Can 1 client initiate multiple file transfers simultaenously?
-- How server will be concurrent if multiple clients are connected to 20?
 - How to decide client ports from N to N+i since they will likely overlap?
+--- Local system
+- Can client use "PORT" command directly?
+
+
+Errnos:
+- EACCES 13
+- EADDRNOTAVAIL 98
+- EADDRINUSE 99
