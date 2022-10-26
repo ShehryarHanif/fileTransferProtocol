@@ -1,8 +1,15 @@
+// #define _OPEN_SYS_ITOA_EXT
+
 #include <dirent.h>
 #include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 #define MAX_TRIES 100
-#define FTP_ACCEPT_TIMEOUT 3
+#define FTP_ACCEPT_TIMEOUT 10
+
+// srand(time(NULL));
 
 // check if local command
 int isLocalCommand(char *input)
@@ -219,9 +226,11 @@ int port(struct State *state)
     bzero(buffer, sizeof(buffer));
     int recv_bytes = read(state->server_sd, buffer, sizeof(buffer));
     printf("Received ftp message: %s\nBytes: %d\n", buffer, recv_bytes);
-    close(ftp_client_connection);
+
+    state->ftp_client_connection = ftp_client_connection;
+    // close(ftp_client_connection);
+
     close(ftp_connection);
-    printf("Closed Connection!\n");
     return 1;
 }
 
@@ -247,21 +256,215 @@ int selectCommand(char **input, int length, struct State *state)
         list(state);
         return 0;
     }
-    else if (strcmp(command, "STOR") == 0)
+    else if (strcmp(command, "STOR") == 0 || strcmp(command, "RETR") == 0)
     {
         // PORT
         if (!port(state))
             return 0;
         return 1;
     }
-    else if (strcmp(command, "RETR") == 0)
-    {
-        // send port command first
-        return 0;
-    }
+    // else if (strcmp(command, "RETR") == 0)
+    // {
+    //     // send port command first
+    //     return 0;
+    // }
     else
     {
         return 1;
         printf("Invalid Local Command\n");
     }
+}
+
+int stor(char **input, int length, struct State *state)
+{
+    // Variable: Ftp_connection variable
+    // Fork
+    printf("\n--------\nStarting retr...\n");
+    if (length != 2)
+    {
+        printf("Invalid number of arguments");
+        return 0;
+    }
+    else if (state->ftp_client_connection == -1) // Check if data connection is valid
+    {
+        printf("FTP Connection not established");
+        return 0;
+    }
+    char *fileName = input[1];
+
+    char filePath[MAX_LINUX_DIR_SIZE];
+
+    snprintf(filePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, fileName);
+
+    FILE *fptr;
+    if ((fptr = fopen(filePath, "rb")) == NULL)
+    {
+        // printf("File not found\n");
+        printf("File not found");
+        // char msg[] = "File not found";
+        // send(state->server_sd, msg, strlen(msg), 0);
+        send(state->server_sd, -1, sizeof(int), 0);
+        return 0;
+    }
+
+    int ftp_connection = state->ftp_client_connection;
+
+    fseek(fptr, 0, SEEK_END);
+    int file_length = ftell(fptr);
+    printf("File Length: %d\n", file_length);
+    send(ftp_connection, &file_length, sizeof(int), 0);
+    fseek(fptr, 0, SEEK_SET);
+
+    char buffer[PACKET_SIZE];
+    
+    int number_of_packets = file_length / PACKET_SIZE;
+
+    printf("Size: %d\nNumber of packets: %d\n", file_length, number_of_packets);
+
+    int i;
+    int send_bytes;
+    for (i = 0; i < number_of_packets; i++)
+    {
+        int start = i * PACKET_SIZE;
+        fread(buffer, 1, PACKET_SIZE, fptr);
+        send_bytes = send(ftp_connection, buffer, PACKET_SIZE, 0);
+        if (send_bytes != PACKET_SIZE)
+            printf("SEND FAIL: Imbalanced Send\n");
+        if (send_bytes <= 0)
+            printf("SEND FAIL: Failed to send Packet!\n");
+    }
+
+    int remaining_bytes = file_length - number_of_packets * PACKET_SIZE;
+
+    if (remaining_bytes > 0)
+    {
+        bzero(buffer, PACKET_SIZE);
+        fread(buffer, 1, remaining_bytes, fptr);
+        send(ftp_connection, buffer, remaining_bytes, 0);
+    }
+
+    close(state->ftp_client_connection);
+    state->ftp_client_connection = -1;
+
+
+    fclose(fptr);
+    return 1;
+}
+
+int retr(char **input, int length, struct State *state)
+{
+    if (DEBUG)
+        printf("A\n");
+    if (length != 2)
+    {
+        return 0;
+    }
+
+    if (DEBUG)
+        printf("B\n");
+    FILE *fptr;
+
+    char filePath[MAX_LINUX_DIR_SIZE];
+    snprintf(filePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, input[1]);
+
+    char tempFilePath[MAX_LINUX_DIR_SIZE];
+    char randomFileName[sizeof(int) * 8 + 1];
+    // itoa(rand(), randomFileName, DECIMAL);
+
+    snprintf(randomFileName, sizeof(randomFileName), "%d", rand());
+
+    strcat(randomFileName, ".tmp");
+
+    snprintf(tempFilePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, randomFileName);
+
+    if (DEBUG)
+        printf("C: File Path: %s\n", filePath);
+    if ((fptr = fopen(tempFilePath, "wb")) == NULL)
+    {
+        printf("File not found\n");
+        return 0;
+    }
+
+    int recv_bytes;
+    int file_length;
+    int ftp_connection = state->ftp_client_connection;
+    char c[1];
+    if (DEBUG)
+        printf("D: ftp_connection\n");
+    recv_bytes = recv(ftp_connection, &file_length, sizeof(int), 0);
+
+    char buffer[PACKET_SIZE];
+
+    // recv_bytes = recv(ftp_connection, buffer, file_size, 0);
+    int number_of_packets = file_length / PACKET_SIZE;
+
+    // char bg = 177;
+    // char load = 219;
+    // for (int i = 0; i < 100; i++)
+    //     printf("-");
+
+    // int packet_per_bar = number_of_packets / 64000 + 1;
+
+    printf("Size: %d\nNumber of packets: %d\nLoading bar: \n", file_length, number_of_packets);
+    int i;
+    for (i = 0; i < number_of_packets; i++)
+    {
+        recv_bytes = recv(ftp_connection, buffer, PACKET_SIZE, 0);
+        while (recv_bytes < PACKET_SIZE)
+        {
+            recv_bytes += recv(ftp_connection, &buffer[recv_bytes], PACKET_SIZE - recv_bytes, 0);
+            // printf("RECEIVE FAIL: Imbalanced recv \n");
+        }
+
+        fwrite(buffer, 1, PACKET_SIZE, fptr);
+    }
+
+    int remaining_bytes = file_length - number_of_packets * PACKET_SIZE;
+
+    int start = i * PACKET_SIZE;
+    if (remaining_bytes > 0)
+    {
+        bzero(buffer, PACKET_SIZE);
+        recv_bytes = recv(ftp_connection, buffer, remaining_bytes, 0);
+        while (recv_bytes < remaining_bytes)
+        {
+            recv_bytes += recv(ftp_connection, &buffer[recv_bytes], remaining_bytes - recv_bytes, 0);
+            // printf("RECEIVE FAIL: Imbalanced recv \n");
+        }
+        fwrite(buffer, 1, remaining_bytes, fptr);
+    }
+
+    // fwrite(buffer, 1, file_size, fptr);
+
+    // do {
+    //     recv_bytes = recv(ftp_connection, c, sizeof(char), 0);
+    //     if (recv_bytes==0) break;
+    //     printf("Received: %d\nChar: %c\n", recv_bytes, c[0]);
+    //     fputc(c[0], fptr);
+    //     // fwrite(&c[0], 1, sizeof(char), fptr);
+    // } while (recv_bytes > 0);
+
+    rename(tempFilePath, filePath);
+
+    if (DEBUG)
+        printf("E");
+    close(ftp_connection);
+    fclose(fptr);
+    return 1;
+}
+
+int handleTransfer(char **input, int length, struct State *state)
+{
+    char *command = input[0];
+    if (strcmp(command, "STOR") == 0)
+    {
+        stor(input, length, state);
+        return 1;
+    }
+    else if (strcmp(command, "RETR") == 0)
+    {
+        retr(input, length, state);
+        return 1;
+    }
+    return 1;
 }

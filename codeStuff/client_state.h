@@ -7,6 +7,7 @@ struct State {
     int port;
     int server_sd;
     int displacement;
+    int ftp_client_connection;
 };
 
 int initializePWD(struct State* state){

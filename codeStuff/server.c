@@ -112,9 +112,15 @@ int main()
 					if (client_sd > max_fd){
 						max_fd = client_sd; // Update the max_fd if new socket has higher FD
 					}
-					int state_index = fd - initial_max_fd - 1;
+					int state_index = client_sd - initial_max_fd - 1;
 					// `fd - initial_max_fd - 1` represents the index of clients starting from 0
+					resetState(&state[state_index]);
 					state[state_index].client_sd = client_sd;
+
+					// Auto login:
+					strcpy(state[state_index].user, "bob");
+					state[state_index].authenticated = 1;
+					sprintf(state->pwd, "%s/", "bob");
 				}
 				else
 				{
@@ -137,7 +143,9 @@ int main()
 						// break; // If no bytes were received, then break loop and end communication
 						continue;
 					}
-					selectCommand(buffer, 4096, &state[state_index]);
+					int shouldSendData = selectCommand(buffer, 4096, &state[state_index]);
+
+					if (!shouldSendData) continue;
 					
 					// send(fd, state[state_index].msg, MAX_MESSAGE_SIZE*sizeof(char), 0);
 					if (strcmp(state[state_index].msg, "")==0) strcpy(state[state_index].msg, " ");

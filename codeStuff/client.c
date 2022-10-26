@@ -87,6 +87,8 @@ int main()
 		
 		int send_bytes = send(server_sd, buffer, strlen(buffer), 0);
 
+		handleTransfer(input, length, &state);
+
 		if (strcmp(buffer, "QUIT!") == 0) break;
 
 		bzero(buffer,sizeof(buffer));

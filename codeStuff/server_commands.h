@@ -173,7 +173,8 @@ int openDataConnection(char *address, int length, struct State *state)
     int ftp_connection = socket(AF_INET, SOCK_STREAM, 0);
 
     int value = 1;
-    if (setsockopt(ftp_connection, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(int))<0){
+    if (setsockopt(ftp_connection, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(int)) < 0)
+    {
         perror("setsockopt failed");
         return 0;
     }
@@ -219,27 +220,209 @@ int openDataConnection(char *address, int length, struct State *state)
     printf("Sending: %s\nLength: %ld\n", PORTOK, strlen(PORTOK));
     // send(state->client_sd, PORTOK, strlen(PORTOK), 0);
     strcpy(state->msg, PORTOK);
-    close(ftp_connection);
+    state->ftp_client_connection = ftp_connection;
+    // close(ftp_connection);
     printf("Closed Connection!\n");
     return 1;
 }
 
-int stor(struct State *state){
+
+int stor(char **input, int length, struct State *state)
+{
+    if (DEBUG)
+        printf("A\n");
+    if (length != 2)
+    {
+        strcpy(state->msg, "Invalid number of arguments");
+        return 0;
+    }
+    else if (state->ftp_client_connection == -1) // Check if data connection is valid
+    {
+        strcpy(state->msg, "FTP Connection not established");
+        return 0;
+    }
+
+
+    FILE *fptr;
+
+    char filePath[MAX_LINUX_DIR_SIZE];
+    snprintf(filePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, input[1]);
+
+    char tempFilePath[MAX_LINUX_DIR_SIZE];
+    char randomFileName[sizeof(int) * 8 + 1];
+    // itoa(rand(), randomFileName, DECIMAL);
+
+    snprintf(randomFileName, sizeof(randomFileName), "%d", rand());
+
+    strcat(randomFileName, ".tmp");
+
+    snprintf(tempFilePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, randomFileName);
+
+    if (DEBUG)
+        printf("C: File Path: %s\n", filePath);
+    if ((fptr = fopen(tempFilePath, "wb")) == NULL)
+    {
+        printf("File not found\n");
+        return 0;
+    }
+
+    int recv_bytes;
+    int file_length;
+    int ftp_connection = state->ftp_client_connection;
+
+    if (DEBUG)
+        printf("D: ftp_connection\n");
+    recv_bytes = recv(ftp_connection, &file_length, sizeof(int), 0);
+
+    if (file_length < 0) return 0; // TODO 
+
+    char buffer[PACKET_SIZE];
+
+    // recv_bytes = recv(ftp_connection, buffer, file_size, 0);
+    int number_of_packets = file_length / PACKET_SIZE;
+
+    printf("Size: %d\nNumber of packets: %d\nLoading bar: \n", file_length, number_of_packets);
+    int i;
+    for (i = 0; i < number_of_packets; i++)
+    {
+        recv_bytes = recv(ftp_connection, buffer, PACKET_SIZE, 0);
+        while (recv_bytes < PACKET_SIZE)
+        {
+            recv_bytes += recv(ftp_connection, &buffer[recv_bytes], PACKET_SIZE-recv_bytes, 0);
+            // printf("RECEIVE FAIL: Imbalanced recv \n");
+        }
+
+        fwrite(buffer, 1, PACKET_SIZE, fptr);
+    }
+
+    int remaining_bytes = file_length - number_of_packets * PACKET_SIZE;
+
+    int start = i * PACKET_SIZE;
+    if (remaining_bytes > 0)
+    {
+        bzero(buffer, PACKET_SIZE);
+        recv_bytes = recv(ftp_connection, buffer, remaining_bytes, 0);
+        while (recv_bytes < remaining_bytes)
+        {
+            recv_bytes += recv(ftp_connection, &buffer[recv_bytes], remaining_bytes-recv_bytes, 0);
+            // printf("RECEIVE FAIL: Imbalanced recv \n");
+        }
+        fwrite(buffer, 1, remaining_bytes, fptr);
+    }
+
+    // fwrite(buffer, 1, file_size, fptr);
+
+    // do {
+    //     recv_bytes = recv(ftp_connection, c, sizeof(char), 0);
+    //     if (recv_bytes==0) break;
+    //     printf("Received: %d\nChar: %c\n", recv_bytes, c[0]);
+    //     fputc(c[0], fptr);
+    //     // fwrite(&c[0], 1, sizeof(char), fptr);
+    // } while (recv_bytes > 0);
+
+
+    rename(tempFilePath, filePath);
+
+    if (DEBUG)
+        printf("E");
+    close(ftp_connection);
+        // printf( "STOR OK");
+    char STOROK[] = "STOR OK";
+    send(state->client_sd, STOROK, strlen(STOROK), 0);
+    fclose(fptr);
+    return 1;
+}
+
+int retr(char **input, int length, struct State *state)
+{
     // Variable: Ftp_connection variable
     // Fork
-    strcpy(state->msg, "STOR OK");
-    // Recv File
-    // Close ftp_connection
+    printf("\n--------\nStarting retr...\n");
+    if (length != 2)
+    {
+        strcpy(state->msg, "Invalid number of arguments");
+        return 0;
+    }
+    else if (state->ftp_client_connection == -1) // Check if data connection is valid
+    {
+        strcpy(state->msg, "FTP Connection not established");
+        return 0;
+    }
+    char *fileName = input[1];
+
+    char filePath[MAX_LINUX_DIR_SIZE];
+
+    snprintf(filePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, fileName);
+
+    FILE *fptr;
+    if ((fptr = fopen(filePath, "rb")) == NULL)
+    {
+        // printf("File not found\n");
+        strcpy(state->msg, "File not found");
+        char msg[] = "File not found";
+        send(state->client_sd, msg, strlen(msg), 0);
+        return 0;
+    }
+
+    int ftp_connection = state->ftp_client_connection;
+
+    fseek(fptr, 0, SEEK_END);
+    int file_length = ftell(fptr);
+    printf("File Length: %d\n", file_length);
+    send(ftp_connection, &file_length, sizeof(int), 0);
+    fseek(fptr, 0, SEEK_SET);
+
+    char buffer[PACKET_SIZE];
+    // if (num_obj != 1){
+    //     // printf
+    //     printf("\nERRRORRRRRZZZZZZZZZZZZZZZZZZZZZZZZZZ, %d\n", num_obj);
+    // }
+
+    // send(ftp_connection, buffer, file_length,0);
+    int number_of_packets = file_length / PACKET_SIZE;
+
+    printf("Size: %d\nNumber of packets: %d\n", file_length, number_of_packets);
+
+    int i;
+    int send_bytes;
+    for (i = 0; i < number_of_packets; i++)
+    {
+        int start = i * PACKET_SIZE;
+        fread(buffer, 1, PACKET_SIZE, fptr);
+        send_bytes = send(ftp_connection, buffer, PACKET_SIZE, 0);
+        if (send_bytes != PACKET_SIZE) printf("SEND FAIL: Imbalanced Send\n");
+        if (send_bytes <= 0) printf("SEND FAIL: Failed to send Packet!\n");
+    }
+
+    int remaining_bytes = file_length - number_of_packets * PACKET_SIZE;
+
+    int start = i * PACKET_SIZE;
+    if (remaining_bytes > 0)
+    {
+        bzero(buffer, PACKET_SIZE);
+        fread(buffer, 1, remaining_bytes, fptr);
+        send(ftp_connection, buffer, remaining_bytes, 0);
+    }
+
+    close(state->ftp_client_connection);
+    state->ftp_client_connection = -1;
+
+    // strcpy(state->msg, "STOR OK");
+    printf("STOR OK");
+    char STOROK[] = "STOR OK";
+    send(state->client_sd, STOROK, strlen(STOROK), 0);
+    fclose(fptr);
     return 1;
 }
 
 // void selectCommand(char** input, int length, struct State* state){
-void selectCommand(char buffer[], int buffer_size, struct State *state)
+int selectCommand(char buffer[], int buffer_size, struct State *state)
 {
     int length = 0;
     char **input = splitString(buffer, buffer_size, &length);
+    printf("===========\nCommand: %s\n============", buffer);
     if (length == 0)
-        return;
+        return 1;
 
     bzero(state->msg, MAX_MESSAGE_SIZE * sizeof(char));
     char *command = input[0];
@@ -247,24 +430,23 @@ void selectCommand(char buffer[], int buffer_size, struct State *state)
     {
         // handle null
         printf("Error: Null Command \n");
-        return;
+        return 0;
     }
     else if (strcmp(command, "USER") == 0)
     {
         user(input, length, state);
-    }
-    else if (strcmp(command, "USER") == 0)
-    {
-        user(input, length, state);
+        return 1;
     }
     else if (strcmp(command, "PASS") == 0)
     {
         pass(input, length, state);
+        return 1;
     }
     else if (!(state->authenticated))
     {
         // Not authenticated
         strcat(state->msg, "User not authenticated!");
+        return 1;
     }
     else if (strcmp(command, "PORT") == 0)
     {
@@ -272,28 +454,46 @@ void selectCommand(char buffer[], int buffer_size, struct State *state)
         {
             strcpy(state->msg, "Could not succesfully open data connection!");
         }
+        return 1;
     }
     else if (strcmp(command, "STOR") == 0)
     {
-        stor(state);
+        int pid = fork();
+        if (pid == 0)
+        {
+            stor(input, length, state);
+            exit(1);
+        }
+        return 0;
     }
-    // else if (strcmp(command, "RETR") == 0)
-    // {
-    // }
+    else if (strcmp(command, "RETR") == 0)
+    {
+        int pid = fork();
+        if (pid == 0)
+        {
+            retr(input, length, state);
+            exit(1);
+        }
+        return 0;
+    }
     else if (strcmp(command, "LIST") == 0)
     {
         list(input, length, state);
+        return 1;
     }
     else if (strcmp(command, "CWD") == 0)
     {
         cwd(input, length, state);
+        return 1;
     }
     else if (strcmp(command, "PWD") == 0)
     {
         pwd(input, length, state);
+        return 1;
     }
     else
     {
         strcpy(state->msg, "No such command");
+        return 1;
     }
 }

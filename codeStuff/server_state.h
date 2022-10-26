@@ -9,6 +9,7 @@ struct State {
     char msg[MAX_MESSAGE_SIZE];
     int authenticated; // 1 if authenticated; 0 otherwise
     int client_sd;
+    int ftp_client_connection;
 };
 
 struct State state[MAX_CLIENTS];
@@ -19,8 +20,6 @@ void resetState(struct State* state)
     bzero(state->user, MAX_USER_SIZE*sizeof(char));
     bzero(state->msg, MAX_MESSAGE_SIZE*sizeof(char));
     state->authenticated = 0;
+    state->client_sd = -1;
+    state->ftp_client_connection = -1;
 }
-
-// initializeStates(){
-//     for
-// }

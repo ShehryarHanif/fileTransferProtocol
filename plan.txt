@@ -32,7 +32,10 @@ c) Commands Modules (for ! commands) and Command Handler
 Extra TODOs:
 - Free all malloc memory
 - Check all strtok
-
+- Should we just disallow any CWD with a "/"
+- close ftp_client_connection properly alongside return statements
+- Remove strcpy(state->msg, ...) in the forking sections
+- Size limit of INT is approximately 2 GB
 
 Questions:
 - Is file transfer blocking for both server and client?

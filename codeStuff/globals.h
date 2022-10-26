@@ -1,2 +1,4 @@
 #define CONTROL_PORT 1026
 #define DATA_PORT 1025
+
+#define PACKET_SIZE 64000
