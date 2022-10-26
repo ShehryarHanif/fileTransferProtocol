@@ -36,6 +36,7 @@ Extra TODOs:
 - close ftp_client_connection properly alongside return statements
 - Remove strcpy(state->msg, ...) in the forking sections
 - Size limit of INT is approximately 2 GB
+- realpath()
 
 Questions:
 - Is file transfer blocking for both server and client?
@@ -48,3 +49,4 @@ Errnos:
 - EACCES 13
 - EADDRNOTAVAIL 98
 - EADDRINUSE 99
+

@@ -256,7 +256,7 @@ int selectCommand(char **input, int length, struct State *state)
         list(state);
         return 0;
     }
-    else if (strcmp(command, "STOR") == 0 || strcmp(command, "RETR") == 0)
+    else if (strcmp(command, "LIST") == 0 || strcmp(command, "STOR") == 0 || strcmp(command, "RETR") == 0)
     {
         // PORT
         if (!port(state))
@@ -273,6 +273,44 @@ int selectCommand(char **input, int length, struct State *state)
         return 1;
         printf("Invalid Local Command\n");
     }
+}
+
+int listServer(char **input, int length, struct State *state)
+{
+    if (DEBUG)
+        printf("A\n");
+    if (length != 1)
+    {
+        return 0;
+    }
+
+    if (DEBUG)
+        printf("B\n");
+
+    int recv_bytes;
+    int ftp_connection = state->ftp_client_connection;
+    if (DEBUG)
+        printf("D: ftp_connection\n");
+
+    char buffer[PACKET_SIZE];
+    int stringLength;
+
+    while(((recv_bytes = recv(ftp_connection, &stringLength, sizeof(int), 0)) > 0) && (stringLength != 0))
+    {
+        bzero(buffer, PACKET_SIZE);
+        // printf("Size: %d\n", stringLength);
+        recv_bytes = recv(ftp_connection, buffer, stringLength, 0);
+        // buffer[recv_bytes] = '\0';
+        // printf("RECEIVED Bytes: %d\n", recv_bytes);
+        printf("%s", buffer);
+    }
+
+    fflush(stdout);
+
+    if (DEBUG)
+        printf("E");
+    close(ftp_connection);
+    return 1;
 }
 
 int stor(char **input, int length, struct State *state)
@@ -316,7 +354,7 @@ int stor(char **input, int length, struct State *state)
     fseek(fptr, 0, SEEK_SET);
 
     char buffer[PACKET_SIZE];
-    
+
     int number_of_packets = file_length / PACKET_SIZE;
 
     printf("Size: %d\nNumber of packets: %d\n", file_length, number_of_packets);
@@ -346,9 +384,19 @@ int stor(char **input, int length, struct State *state)
     close(state->ftp_client_connection);
     state->ftp_client_connection = -1;
 
-
     fclose(fptr);
     return 1;
+}
+
+int exists(const char *fname) // https://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c
+{
+    FILE *file;
+    if ((file = fopen(fname, "r")))
+    {
+        fclose(file);
+        return 1;
+    }
+    return 0;
 }
 
 int retr(char **input, int length, struct State *state)
@@ -369,11 +417,16 @@ int retr(char **input, int length, struct State *state)
 
     char tempFilePath[MAX_LINUX_DIR_SIZE];
     char randomFileName[sizeof(int) * 8 + 1];
-    // itoa(rand(), randomFileName, DECIMAL);
+    char randomFileNameExtension[] = ".tmp";
 
     snprintf(randomFileName, sizeof(randomFileName), "%d", rand());
+    strcat(randomFileName, randomFileNameExtension);
 
-    strcat(randomFileName, ".tmp");
+    while (exists(randomFileName))
+    {
+        snprintf(randomFileName, sizeof(randomFileName), "%d", rand());
+        strcat(randomFileName, randomFileNameExtension);
+    }
 
     snprintf(tempFilePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, randomFileName);
 
@@ -395,15 +448,7 @@ int retr(char **input, int length, struct State *state)
 
     char buffer[PACKET_SIZE];
 
-    // recv_bytes = recv(ftp_connection, buffer, file_size, 0);
     int number_of_packets = file_length / PACKET_SIZE;
-
-    // char bg = 177;
-    // char load = 219;
-    // for (int i = 0; i < 100; i++)
-    //     printf("-");
-
-    // int packet_per_bar = number_of_packets / 64000 + 1;
 
     printf("Size: %d\nNumber of packets: %d\nLoading bar: \n", file_length, number_of_packets);
     int i;
@@ -434,16 +479,6 @@ int retr(char **input, int length, struct State *state)
         fwrite(buffer, 1, remaining_bytes, fptr);
     }
 
-    // fwrite(buffer, 1, file_size, fptr);
-
-    // do {
-    //     recv_bytes = recv(ftp_connection, c, sizeof(char), 0);
-    //     if (recv_bytes==0) break;
-    //     printf("Received: %d\nChar: %c\n", recv_bytes, c[0]);
-    //     fputc(c[0], fptr);
-    //     // fwrite(&c[0], 1, sizeof(char), fptr);
-    // } while (recv_bytes > 0);
-
     rename(tempFilePath, filePath);
 
     if (DEBUG)
@@ -464,6 +499,11 @@ int handleTransfer(char **input, int length, struct State *state)
     else if (strcmp(command, "RETR") == 0)
     {
         retr(input, length, state);
+        return 1;
+    }
+    else if (strcmp(command, "LIST") == 0)
+    {
+        listServer(input, length, state);
         return 1;
     }
     return 1;

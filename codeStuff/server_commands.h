@@ -80,7 +80,7 @@ int pass(char **input, int length, struct State *state)
 
 int list(char **input, int length, struct State *state)
 {
-
+    printf("Starting LIST...\n");
     // https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
     DIR *d;
     struct dirent *dir;
@@ -89,14 +89,29 @@ int list(char **input, int length, struct State *state)
     // bzero(state->msg);
     if (d)
     {
+        printf("List: A\n");
         dir = readdir(d);
         dir = readdir(d);
         while ((dir = readdir(d)) != NULL)
         {
+            // printf("List: Loop\n");
+            bzero(state->msg, sizeof(state->msg));
             strcat(state->msg, dir->d_name);
             strcat(state->msg, "\n");
+            // printf("%s: %d bytes\n", state->msg, strlen(state->msg));
+            // printf("TTRUTHINESS:%d\n", sizeof(strlen(state->msg)) == sizeof(int));
+            int size = strlen(state->msg);
+            // printf("- List: Size: %d\n", size);
+            send(state->ftp_client_connection, &size, sizeof(int), 0);
+            send(state->ftp_client_connection, state->msg, strlen(state->msg), 0);
         }
+
+        int falseFlag = 0;
+        send(state->ftp_client_connection, &falseFlag, sizeof(int), 0);
+        close(state->ftp_client_connection);
         closedir(d);
+        char LISTOK[] = "LIST OK";
+        send(state->client_sd, LISTOK, strlen(LISTOK), 0);
     }
     else
     {
@@ -226,6 +241,16 @@ int openDataConnection(char *address, int length, struct State *state)
     return 1;
 }
 
+int exists(const char *fname) // https://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c
+{
+    FILE *file;
+    if ((file = fopen(fname, "r")))
+    {
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
 
 int stor(char **input, int length, struct State *state)
 {
@@ -250,11 +275,15 @@ int stor(char **input, int length, struct State *state)
 
     char tempFilePath[MAX_LINUX_DIR_SIZE];
     char randomFileName[sizeof(int) * 8 + 1];
-    // itoa(rand(), randomFileName, DECIMAL);
+    char randomFileNameExtension[] = ".tmp";
 
     snprintf(randomFileName, sizeof(randomFileName), "%d", rand());
+    strcat(randomFileName, randomFileNameExtension);
 
-    strcat(randomFileName, ".tmp");
+    while(exists(randomFileName)){
+        snprintf(randomFileName, sizeof(randomFileName), "%d", rand());
+        strcat(randomFileName, randomFileNameExtension);
+    }
 
     snprintf(tempFilePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, randomFileName);
 
@@ -309,17 +338,6 @@ int stor(char **input, int length, struct State *state)
         }
         fwrite(buffer, 1, remaining_bytes, fptr);
     }
-
-    // fwrite(buffer, 1, file_size, fptr);
-
-    // do {
-    //     recv_bytes = recv(ftp_connection, c, sizeof(char), 0);
-    //     if (recv_bytes==0) break;
-    //     printf("Received: %d\nChar: %c\n", recv_bytes, c[0]);
-    //     fputc(c[0], fptr);
-    //     // fwrite(&c[0], 1, sizeof(char), fptr);
-    // } while (recv_bytes > 0);
-
 
     rename(tempFilePath, filePath);
 
@@ -478,8 +496,13 @@ int selectCommand(char buffer[], int buffer_size, struct State *state)
     }
     else if (strcmp(command, "LIST") == 0)
     {
-        list(input, length, state);
-        return 1;
+        int pid = fork();
+        if (pid == 0)
+        {
+            list(input, length, state);
+            exit(1);
+        }
+        return 0;
     }
     else if (strcmp(command, "CWD") == 0)
     {
