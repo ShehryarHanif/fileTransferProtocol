@@ -52,8 +52,7 @@ int cwd(char **input, int length, struct State *state)
     if (!d)
     {
         // given folder does not exist
-        // TODO: Proper error msg
-        printf("404 Not Found");
+        printf("404 Not Found"); // TODO
         return 0;
     }
     bzero(state->pwd, sizeof(state->pwd));

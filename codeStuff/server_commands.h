@@ -59,7 +59,7 @@ int pass(char **input, int length, struct State *state)
     if (state->user == NULL || state->authenticated == 1)
     {
         // 503 Bad sequence of commands
-        strcat(state->msg, "503 Bad sequence of commands");
+        strcat(state->msg, "503 Bad sequence of commands.");
         return 0;
     }
     if (!verifyUserPassword(state->user, input[1]))
@@ -109,12 +109,14 @@ int list(char **input, int length, struct State *state)
         send(state->ftp_client_connection, &falseFlag, sizeof(int), 0);
         close(state->ftp_client_connection);
         closedir(d);
-        char LISTOK[] = "LIST OK";
+        char LISTOK[] = "LIST OK"; // TODO
         send(state->client_sd, LISTOK, strlen(LISTOK), 0);
     }
     else
     {
         // TODO: Figure this out
+        char FILENOTFOUND[] = "550 No such file or directory.";
+        send(state->client_sd, LISTOK, strlen(LISTOK), 0);
         // directory does not exist (if errno == ENOENT) with #include <errno.h>
         return 0;
     }
@@ -158,8 +160,7 @@ int cwd(char **input, int length, struct State *state)
     if (!d)
     {
         // given folder does not exist
-        printf("Folder `%s` does not exist!\n", newPWD);
-        strcpy(state->msg, "Folder does not exist!");  // TODO
+        strcpy(state->msg, "550 No such file or directory.");
         return 0;
     }
     bzero(state->pwd, sizeof(state->pwd));
@@ -248,7 +249,7 @@ int stor(char **input, int length, struct State *state)
     }
     else if (state->ftp_client_connection == -1) // Check if data connection is valid
     {
-        strcpy(state->msg, "FTP Connection not established");
+        strcpy(state->msg, "503 Bad sequence of commands.");
         return 0;
     }
 
@@ -330,8 +331,8 @@ int stor(char **input, int length, struct State *state)
         printf("E");
     close(ftp_connection);
         // printf( "STOR OK");
-    char STOROK[] = "STOR OK";
-    send(state->client_sd, STOROK, strlen(STOROK), 0);
+    char OKMSG[] = "226 Transfer completed.";
+    send(state->client_sd, OKMSG, strlen(OKMSG), 0);
     fclose(fptr);
     return 1;
 }
@@ -348,7 +349,7 @@ int retr(char **input, int length, struct State *state)
     }
     else if (state->ftp_client_connection == -1) // Check if data connection is valid
     {
-        strcpy(state->msg, "FTP Connection not established");
+        strcpy(state->msg, "503 Bad sequence of commands.");
         return 0;
     }
     char *fileName = input[1];
@@ -412,8 +413,8 @@ int retr(char **input, int length, struct State *state)
 
     // strcpy(state->msg, "STOR OK");
     printf("STOR OK");
-    char STOROK[] = "STOR OK";
-    send(state->client_sd, STOROK, strlen(STOROK), 0);
+    char OKMSG[] = "226 Transfer completed.";
+    send(state->client_sd, OKMSG, strlen(OKMSG), 0);
     fclose(fptr);
     return 1;
 }
@@ -448,7 +449,7 @@ int selectCommand(char buffer[], int buffer_size, struct State *state)
     else if (!(state->authenticated))
     {
         // Not authenticated
-        strcat(state->msg, "User not authenticated!");
+        strcat(state->msg, "530 Not logged in.");
         return 1;
     }
     else if (strcmp(command, "PORT") == 0)
@@ -502,7 +503,7 @@ int selectCommand(char buffer[], int buffer_size, struct State *state)
     }
     else
     {
-        strcpy(state->msg, "No such command");
+        strcpy(state->msg, "202 Command not implemented.");
         return 1;
     }
 }
