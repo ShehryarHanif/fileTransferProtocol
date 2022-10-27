@@ -13,7 +13,7 @@
 #include "server_users.h"
 #include "server_commands.h"
 
-#define DEBUG 1 // We can print debugging comments by choice
+#define DEBUG  // We can print debugging comments by choice
 #define MAX_CLIENTS 5 // We have a global variable controlling the maximum number of possible clients
 #define BUFFER_SIZE 4096 // This is the maximum size of the message(s) on the control channel
 
@@ -180,6 +180,6 @@ int main(){ // The socket created here deals with the control channel
 			}
 		}
 	}
-	
+
 	close(server_sd);
 }
