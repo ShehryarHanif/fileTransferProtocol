@@ -19,21 +19,20 @@ int user(char **input, int length, struct State *state)
 
     // If the number of arguments is not 2 (USER + "<username>"),
     // or if the user does not exist
-    // Then the argument fails
+    // Then the command fails
     if (length != 2)
     {
-        // Error msg: Invalid Number of Parameters
-        strcat(state->msg, "Invalid Number of Parameters");
+        strcat(state->msg, "Invalid Number of Parameters"); // TODO
         return 0;
     }
     if (!verifyUserExists(input[1]))
     {
-        strcat(state->msg, "Invalid User");
+        strcat(state->msg, "530 Not logged in.");
         return 0;
     }
     state->authenticated = 0;
     strncpy(state->user, input[1], MAX_USER_SIZE);
-    strcat(state->msg, "User OK");
+    strcat(state->msg, "331 Username OK, need password.");
     return 1;
 }
 
@@ -42,7 +41,7 @@ void createFolder(char *pwd)
     struct stat st = {0};
     // https://stackoverflow.com/questions/7430248/creating-a-new-directory-in-c
     if (stat(pwd, &st) == -1)
-        mkdir(pwd, 0700);
+        mkdir(pwd, 0700); // TODO
 }
 // returns 1 if succesful
 // returns 0 otherwise
@@ -54,7 +53,7 @@ int pass(char **input, int length, struct State *state)
     // Then the argument fails
     if (length != 2) // TODO: Create separate error messages
     {
-        strcat(state->msg, "Invalid Number of Parameters");
+        strcat(state->msg, "Invalid Number of Parameters"); // TODO
         return 0;
     }
     if (state->user == NULL || state->authenticated == 1)
@@ -66,14 +65,14 @@ int pass(char **input, int length, struct State *state)
     if (!verifyUserPassword(state->user, input[1]))
     {
         // Wrong password
-        strcat(state->msg, "Wrong password");
+        strcat(state->msg, "530 Not logged in.");
         return 0;
     }
     state->authenticated = 1;
     strcpy(state->pwd, state->user);
     strcat(state->pwd, "/");
     createFolder(state->pwd);
-    strcat(state->msg, "Logged In!");
+    strcat(state->msg, "230 User logged in, proceed.");
 
     return 1;
 }
@@ -124,7 +123,9 @@ int list(char **input, int length, struct State *state)
 
 int pwd(char **input, int length, struct State *state)
 {
-    strcat(state->msg, state->pwd);
+    // strcpy(state->msg, "257 pathname.\n");
+    // strcat(state->msg, state->pwd);
+    snprintf(state->msg, MAX_MESSAGE_SIZE, "257 %s", state->pwd);
     return 1;
 }
 
@@ -144,42 +145,26 @@ int cwd(char **input, int length, struct State *state)
 {
     if (length != 2)
     {
-        strcat(state->msg, "Invalid number of arguments");
+        strcat(state->msg, "Invalid number of arguments"); // TODO
         return 0;
     }
     char *newDir = input[1];
     char newPWD[MAX_LINUX_DIR_SIZE];
     bzero(newPWD, MAX_LINUX_DIR_SIZE * sizeof(char));
-    // We have not considered the cases when newDir == "../.", "./../.././.." or any such combinations
-    if (strcmp(newDir, "..") == 0)
-    {
-        strcpy(newPWD, state->pwd);
-        goBackFolder(newPWD);
-    }
-    else if (strcmp(newDir, ".") == 0)
-    {
-        return 1;
-    }
-    else
-    {
-        strcpy(newPWD, state->pwd);
-        strcat(newPWD, newDir);
-        strcat(newPWD, "/");
-    }
-
+    
     // Check if newPWD is a valid dir
     DIR *d;
     d = opendir(newPWD);
     if (!d)
     {
         // given folder does not exist
-        // TODO: Proper error msg
         printf("Folder `%s` does not exist!\n", newPWD);
-        strcat(state->msg, "Folder does not exist!\n");
+        strcpy(state->msg, "Folder does not exist!");  // TODO
         return 0;
     }
     bzero(state->pwd, sizeof(state->pwd));
     strcpy(state->pwd, newPWD);
+    strcpy(state->msg, "200 directory changed to pathname/foldername.");
     return 1;
 }
 
@@ -470,7 +455,8 @@ int selectCommand(char buffer[], int buffer_size, struct State *state)
     {
         if (!openDataConnection(input[1], length, state))
         {
-            strcpy(state->msg, "Could not succesfully open data connection!");
+            
+            strcpy(state->msg, "200 PORT command successful");
         }
         return 1;
     }

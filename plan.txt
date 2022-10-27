@@ -1,42 +1,32 @@
 PLAN:
 
-1. Implement User Authentication System using users.txt
---- Probably just create structs to store users and then store all users in array
---- Or whenver user logins, scan through file
---- Both works ig
-
-2. Decide on structure of file
---- A lot of complex functions at work here
---- Need to neatly compartmentalize them
-
 * = to do next
 ** = done
 
 
 Modules/Parts Needed for Server:
 a) Connection Creation/Handling (the core component)
----- Convert fork to connect *
-b) Reading and disecting user input  *
+---- Convert fork to connect **
+b) Reading and disecting user input  **
 c) User Authentication module**
-d) Command Handler and Commands Modules
-f) Data transfer part/module
+d) Command Handler and Commands Modules **
+f) Data transfer part/module**
 
 Modules/Parts Needed for Server:
-a) Connection Creation/Handling (the core component)
----- Receiving FTP files
-b) Reading and disecting user input *
-c) Commands Modules (for ! commands) and Command Handler
-
-3. Each data file transfer is done on a different port -> Select/Fork every time
+a) Connection Creation/Handling (the core component) **
+---- Receiving FTP files **
+b) Reading and disecting user input **
+c) Commands Modules (for ! commands) and Command Handler **
 
 Extra TODOs:
 - Free all malloc memory
 - Check all strtok
 - Should we just disallow any CWD with a "/"
+--- realpath()
 - close ftp_client_connection properly alongside return statements
 - Remove strcpy(state->msg, ...) in the forking sections
 - Size limit of INT is approximately 2 GB
-- realpath()
+
 
 Questions:
 - Is file transfer blocking for both server and client?

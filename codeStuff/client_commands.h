@@ -9,14 +9,6 @@
 #define MAX_TRIES 100
 #define FTP_ACCEPT_TIMEOUT 10
 
-// srand(time(NULL));
-
-// check if local command
-int isLocalCommand(char *input)
-{
-    return input[0] == '!';
-}
-
 int pwd(struct State *state)
 {
     printf("%s\n", state->pwd);
@@ -46,22 +38,13 @@ int cwd(char **input, int length, struct State *state)
     char *newDir = input[1];
     char newPWD[MAX_LINUX_DIR_SIZE];
     bzero(newPWD, MAX_LINUX_DIR_SIZE * sizeof(char));
-    // We have not considered the cases when newDir == "../.", "./../.././.." or any such combinations
-    if (strcmp(newDir, "..") == 0)
-    {
-        strcpy(newPWD, state->pwd);
-        goBackFolder(newPWD);
-    }
-    else if (strcmp(newDir, ".") == 0)
-    {
-        return 1;
-    }
-    else
-    {
-        strcpy(newPWD, state->pwd);
-        strcat(newPWD, newDir);
-        strcat(newPWD, "/");
-    }
+
+    strcpy(newPWD, state->pwd);
+    strcat(newPWD, newDir);
+
+    // Resolving .. and .s
+    realpath(newPWD, newPWD);
+    strcat(newPWD, "/"); // Adding extra / at the end to close off the path
 
     // Check if newPWD is a valid dir
     DIR *d;
@@ -70,7 +53,7 @@ int cwd(char **input, int length, struct State *state)
     {
         // given folder does not exist
         // TODO: Proper error msg
-        printf("Folder `%s` does not exist!\n", newPWD);
+        printf("404 Not Found");
         return 0;
     }
     bzero(state->pwd, sizeof(state->pwd));
