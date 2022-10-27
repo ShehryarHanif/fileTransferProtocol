@@ -5,6 +5,7 @@
         "server_commands.h": "c",
         "server_state.h": "c",
         "client_commands.h": "c",
-        "globals.h": "c"
+        "globals.h": "c",
+        "client_state.h": "c"
     }
 }

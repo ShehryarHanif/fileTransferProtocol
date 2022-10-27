@@ -6,3 +6,6 @@
 // We wanted to divide the content of the data into packets, so as to send information in chunks
 
 #define PACKET_SIZE 47
+
+
+char QUITOK[] = "221 Service closing control connection.";

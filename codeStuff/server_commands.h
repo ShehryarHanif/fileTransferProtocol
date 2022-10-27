@@ -4,13 +4,15 @@
 
 int user(char **input, int length, struct State *state) // Handle the "USER" command
 {
-    if (length != 2){ // You must give the "USER" command and a username
-        strcat(state->msg, "Invalid Number of Parameters");
+    if (length != 2)
+    { // You must give the "USER" command and a username
+        strcat(state->msg, "501 Syntax error in parameters or arguments.");
 
         return 0;
     }
 
-    if (!verifyUserExists(input[1])){ // A user has to exist to be logged in
+    if (!verifyUserExists(input[1]))
+    { // A user has to exist to be logged in
         strcat(state->msg, "530 Not logged in.");
         return 0;
     }
@@ -36,11 +38,11 @@ int pass(char **input, int length, struct State *state) // Handle the "PASS" com
 {
     if (length != 2) // // You must give the "PASS" command and a password
     {
-        strcat(state->msg, "Invalid Number of Parameters"); // TODO
+        strcat(state->msg, "501 Syntax error in parameters or arguments."); // TODO
         return 0;
     }
 
-    if (state->user == NULL || state->authenticated == 1) // A user needs to enter a username before the password can be entered
+    if (state->user == NULL && state->authenticated == 0) // A user needs to enter a username before the password can be entered
     {
         strcat(state->msg, "503 Bad sequence of commands.");
 
@@ -64,13 +66,27 @@ int pass(char **input, int length, struct State *state) // Handle the "PASS" com
 
     createFolder(state->pwd);
 
-    strcat(state->msg, "230 User logged in, proceed.");
+    strcpy(state->msg, "230 User logged in, proceed.");
 
     return 1;
 }
 
-int list(char **input, int length, struct State *state){ // Handle the "LIST" command
+int list(char **input, int length, struct State *state)
+{ // Handle the "LIST" command
     // Reference: https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
+
+    if (length != 1)
+    { // You must give the "RETR" command and a file
+        // strcpy(state->msg, "Invalid number of arguments");
+        char msg[] = "501 Syntax error in parameters or arguments.";
+        send(state->client_sd, msg, strlen(msg), 0);
+        if (state->ftp_client_connection != -1)
+        {
+            close(state->ftp_client_connection);
+            state->ftp_client_connection = -1;
+        }
+        return 0;
+    }
 
     DIR *d;
 
@@ -78,13 +94,15 @@ int list(char **input, int length, struct State *state){ // Handle the "LIST" co
 
     d = opendir(state->pwd);
 
-    if (d){
+    if (d)
+    {
         // Ignore the ever-present "." and ".." directories
 
         dir = readdir(d);
         dir = readdir(d);
 
-        while ((dir = readdir(d)) != NULL){ // Read each file one by one and send it
+        while ((dir = readdir(d)) != NULL)
+        { // Read each file one by one and send it
             bzero(state->msg, sizeof(state->msg));
 
             strcat(state->msg, dir->d_name);
@@ -106,31 +124,34 @@ int list(char **input, int length, struct State *state){ // Handle the "LIST" co
 
         char LISTOK[] = "226 Transfer completed.";
 
-
         send(state->client_sd, LISTOK, strlen(LISTOK), 0);
-    } else {
+    }
+    else
+    {
         char FILENOTFOUND[] = "550 No File or Directory.";
-
         send(state->client_sd, FILENOTFOUND, strlen(FILENOTFOUND), 0);
-
+        close(state->ftp_client_connection);
         return 0;
     }
 
     return 1;
 }
 
-int pwd(char **input, int length, struct State *state){ // Handle the "PWD" command
+int pwd(char **input, int length, struct State *state)
+{ // Handle the "PWD" command
     snprintf(state->msg, MAX_MESSAGE_SIZE, "257 %s", state->pwd);
 
     return 1;
 }
 
-int goBackFolder(char newPWD[MAX_LINUX_DIR_SIZE]){ // Used to move a folder back with "CWD"
+int goBackFolder(char newPWD[MAX_LINUX_DIR_SIZE])
+{ // Used to move a folder back with "CWD"
     int length = strlen(newPWD);
 
     int i = length - 2;
 
-    while (i >= 0){
+    while (i >= 0)
+    {
         if (newPWD[i] == '/')
             break;
 
@@ -138,9 +159,11 @@ int goBackFolder(char newPWD[MAX_LINUX_DIR_SIZE]){ // Used to move a folder back
     }
 }
 
-int cwd(char **input, int length, struct State *state) // Handle the "CWD" command{
-    if (length != 2){ // You must give the "CWD" command and a directory
-        strcat(state->msg, "Invalid number of arguments");
+int cwd(char **input, int length, struct State *state)
+{ // Handle the "CWD" command
+    if (length != 2)
+    { // You must give the "CWD" command and a directory
+        strcpy(state->msg, "501 Syntax error in parameters or arguments.");
 
         return 0;
     }
@@ -150,18 +173,27 @@ int cwd(char **input, int length, struct State *state) // Handle the "CWD" comma
     char newPWD[MAX_LINUX_DIR_SIZE];
 
     bzero(newPWD, MAX_LINUX_DIR_SIZE * sizeof(char));
-    
+
+    strcpy(newPWD, state->pwd);
+    strcat(newPWD, newDir);
+
+    // Resolving ".."s and "."s in the path
+
+    realpath(newPWD, newPWD);
+
+    strcat(newPWD, "/"); // Adding extra "/" at the end to close off the path
+
     // Check if "newPWD" is a valid directory
 
     DIR *d;
 
     d = opendir(newPWD);
 
-    if (!d){ // Handle the case with the wrong directory        
+    if (!d)
+    { // Handle the case with the wrong directory
         strcpy(state->msg, "550 No such file or directory.");
 
         return 0;
-
     }
 
     // Update the present working directory
@@ -169,23 +201,27 @@ int cwd(char **input, int length, struct State *state) // Handle the "CWD" comma
     bzero(state->pwd, sizeof(state->pwd));
 
     strcpy(state->pwd, newPWD);
-    strcpy(state->msg, "200 directory changed to pathname/foldername.");
+    // strcpy(state->msg, );
+    snprintf(state->msg, MAX_MESSAGE_SIZE, "200 directory changed to %s", newPWD);
 
     return 1;
 }
 
-int openDataConnection(char *address, int length, struct State *state){ // Handle the creation of the data channel with the "PORT" command
+int openDataConnection(char *address, int length, struct State *state)
+{ // Handle the creation of the data channel with the "PORT" command
     int ftp_connection = socket(AF_INET, SOCK_STREAM, 0);
 
     int value = 1;
 
-    if (setsockopt(ftp_connection, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(int)) < 0){
-        perror("setsockopt failed");
+    if (setsockopt(ftp_connection, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(int)) < 0)
+    {
+        perror("setsockopt failed"); // TODO
         return 0;
     }
 
-    if (ftp_connection < 0){
-        perror("socket");
+    if (ftp_connection < 0)
+    {
+        perror("socket"); // TODO
 
         exit(-1);
     }
@@ -202,7 +238,7 @@ int openDataConnection(char *address, int length, struct State *state){ // Handl
 
     if (bind(ftp_connection, (struct sockaddr *)&ftp_connection_addr, sizeof(ftp_connection_addr)) < 0)
     {
-        perror("bind failed");
+        perror("bind failed"); // TODO
         return 0;
     }
 
@@ -228,7 +264,8 @@ int openDataConnection(char *address, int length, struct State *state){ // Handl
 
     // printf("Connecting on address: %s:%d\n", ipaddr, port);
 
-    if (connect(ftp_connection, (struct sockaddr *)&ftp_connection_client_addr, sizeof(ftp_connection_client_addr)) < 0){
+    if (connect(ftp_connection, (struct sockaddr *)&ftp_connection_client_addr, sizeof(ftp_connection_client_addr)) < 0)
+    {
         perror("connect");
 
         strcpy(state->msg, "Could not establish FTP connection");
@@ -245,13 +282,28 @@ int openDataConnection(char *address, int length, struct State *state){ // Handl
     return 1;
 }
 
+void copyFile(const char* originalFileName, const char* newFileName){ // Create a copy of a file
+   FILE *source, *target;
+ 
+   source = fopen(originalFileName, "rb");
+  
+   target = fopen(newFileName, "wb");
+
+   char ch;
+ 
+   while((ch = fgetc(source)) != EOF)
+      fputc(ch, target);
+  
+   fclose(source);
+   fclose(target);
+}
+
 int exists(const char *fname) // Check if a file exists: https://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c
 {
     FILE *file;
 
     if ((file = fopen(fname, "r"))){
         fclose(file);
-
         return 1;
     }
 
@@ -263,15 +315,22 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
     if (DEBUG)
         printf("A\n");
 
-    if (length != 2){ // You must give the "STOR" command and a file
-        strcpy(state->msg, "Invalid number of arguments");
-
+    if (state->ftp_client_connection == -1) // Check if the data connection is valid, that is a user is logged in and other stuff has happened
+    {
+        char msg[] = "503 Bad sequence of commands.";
+        send(state->client_sd, msg, strlen(msg), 0);
         return 0;
     }
-    else if (state->ftp_client_connection == -1) // Check if the data connection is valid, that is a user is logged in and other stuff has happened
-    {
-        strcpy(state->msg, "503 Bad sequence of commands.");
-
+    else if (length != 2)
+    { // You must give the "STOR" command and a file
+        // strcpy(state->msg, "Invalid number of arguments");
+        char msg[] = "501 Syntax error in parameters or arguments.";
+        send(state->client_sd, msg, strlen(msg), 0);
+        if (state->ftp_client_connection != -1)
+        {
+            close(state->ftp_client_connection);
+            state->ftp_client_connection = -1;
+        }
         return 0;
     }
 
@@ -282,6 +341,20 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
     char filePath[MAX_LINUX_DIR_SIZE];
 
     snprintf(filePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, input[1]);
+
+    if (!exists(filePath))
+    {
+        // strcpy(state->msg, "550 No such file or directory.");
+
+        char msg[] = "550 No such file or directory.";
+
+        send(state->client_sd, msg, strlen(msg), 0);
+        
+        close(state->ftp_client_connection);
+
+        return 0;
+    }
+    
 
     char tempFilePath[MAX_LINUX_DIR_SIZE];
 
@@ -295,7 +368,8 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
 
     strcat(randomFileName, randomFileNameExtension);
 
-    while(exists(randomFileName)){
+    while (exists(randomFileName))
+    {
         snprintf(randomFileName, sizeof(randomFileName), "%d", rand());
 
         strcat(randomFileName, randomFileNameExtension);
@@ -311,6 +385,9 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
     if ((fptr = fopen(tempFilePath, "wb")) == NULL)
     {
         printf("550 No such file or directory.\n");
+        char msg[] = "550 No such file or directory.";
+        send(state->client_sd, msg, strlen(msg), 0);
+        close(state->ftp_client_connection);
         return 0;
     }
 
@@ -321,7 +398,7 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
     int ftp_connection = state->ftp_client_connection;
 
     if (DEBUG)
-        printf("D: ftp_connection\n");
+        printf("D: ftp_connection Starting...\n");
 
     // First, get the length of the file
 
@@ -343,7 +420,8 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
 
         while (recv_bytes < PACKET_SIZE)
         {
-            recv_bytes += recv(ftp_connection, &buffer[recv_bytes], PACKET_SIZE-recv_bytes, 0);
+            // TODO: recv might return -1 though
+            recv_bytes += recv(ftp_connection, &buffer[recv_bytes], PACKET_SIZE - recv_bytes, 0);
         }
 
         fwrite(buffer, 1, PACKET_SIZE, fptr);
@@ -361,8 +439,9 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
 
         recv_bytes = recv(ftp_connection, buffer, remaining_bytes, 0);
 
-        while (recv_bytes < remaining_bytes){
-            recv_bytes += recv(ftp_connection, &buffer[recv_bytes], remaining_bytes-recv_bytes, 0);
+        while (recv_bytes < remaining_bytes)
+        {
+            recv_bytes += recv(ftp_connection, &buffer[recv_bytes], remaining_bytes - recv_bytes, 0);
         }
         fwrite(buffer, 1, remaining_bytes, fptr);
     }
@@ -387,15 +466,20 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
 
 int retr(char **input, int length, struct State *state) // Handle the "RETR" command
 {
-    if (length != 2){ // You must give the "RETR" command and a file
-        strcpy(state->msg, "Invalid number of arguments");
-
+    
+    if (state->ftp_client_connection == -1) // Check if the data connection is valid, that is a user is logged in and other stuff has happened
+    {
+        // strcpy(state->msg, "503 Bad sequence of commands.");
+        char msg[] = "503 Bad sequence of commands.";
+        send(state->client_sd, msg, strlen(msg), 0);
         return 0;
     }
-    else if (state->ftp_client_connection == -1) // Check if the data connection is valid, that is a user is logged in and other stuff has happened
-    {
-        strcpy(state->msg, "503 Bad sequence of commands.");
-
+    else if (length != 2)
+    { // You must give the "RETR" command and a file
+        // strcpy(state->msg, "Invalid number of arguments");
+        char msg[] = "501 Syntax error in parameters or arguments.";
+        send(state->client_sd, msg, strlen(msg), 0);
+        state->ftp_client_connection = -1;
         return 0;
     }
 
@@ -409,13 +493,16 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
 
     FILE *fptr;
 
-    if ((fptr = fopen(filePath, "rb")) == NULL){
-        strcpy(state->msg, "550 No such file or directory.");
+    if (!exists(filePath))
+    {
+        // strcpy(state->msg, "550 No such file or directory.");
 
         char msg[] = "550 No such file or directory.";
 
         send(state->client_sd, msg, strlen(msg), 0);
         
+        close(state->ftp_client_connection);
+
         return 0;
     }
 
@@ -439,7 +526,8 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
 
     int send_bytes;
 
-    for (i = 0; i < number_of_packets; i++){
+    for (i = 0; i < number_of_packets; i++)
+    {
         int start = i * PACKET_SIZE;
 
         fread(buffer, 1, PACKET_SIZE, fptr);
@@ -453,7 +541,8 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
 
     int start = i * PACKET_SIZE;
 
-    if (remaining_bytes > 0){
+    if (remaining_bytes > 0)
+    {
         bzero(buffer, PACKET_SIZE);
         fread(buffer, 1, remaining_bytes, fptr);
         send(ftp_connection, buffer, remaining_bytes, 0);
@@ -474,11 +563,8 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
     return 1;
 }
 
-int selectCommand(char buffer[], int buffer_size, struct State *state){ // Handle all the commands needed by the user on the server side
-    int length = 0;
-
-    char **input = splitString(buffer, buffer_size, &length);
-
+int selectCommand(char **input, int length, struct State *state)
+{ // Handle all the commands needed by the user on the server side
     if (length == 0)
         return 1;
 
@@ -503,6 +589,11 @@ int selectCommand(char buffer[], int buffer_size, struct State *state){ // Handl
     }
     else if (!(state->authenticated)) // Non-authentication will not allow certain commands
     {
+        if (strcmp(command, "PORT") == 0)
+        {
+            recv(state->client_sd, state->msg, sizeof(state->msg), 0);
+            bzero(state->msg, sizeof(state->msg));
+        }
         strcat(state->msg, "530 Not logged in.");
 
         return 1;
@@ -564,7 +655,7 @@ int selectCommand(char buffer[], int buffer_size, struct State *state){ // Handl
     else if (strcmp(command, "PWD") == 0)
     {
         pwd(input, length, state);
-        
+
         return 1;
     }
     else

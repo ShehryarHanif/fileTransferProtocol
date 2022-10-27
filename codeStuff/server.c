@@ -7,15 +7,15 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#define DEBUG 0 // We can print debugging comments by choice
+#define MAX_CLIENTS 5 // We have a global variable controlling the maximum number of possible clients
+#define BUFFER_SIZE 4096 // This is the maximum size of the message(s) on the control channel
+
 #include "globals.h"
 #include "server_state.h"
 #include "server_input.h"
 #include "server_users.h"
 #include "server_commands.h"
-
-#define DEBUG 0 // We can print debugging comments by choice
-#define MAX_CLIENTS 5 // We have a global variable controlling the maximum number of possible clients
-#define BUFFER_SIZE 4096 // This is the maximum size of the message(s) on the control channel
 
 // Code template from "rn3_simple_server_updated.c" by Rohail Asim
 
@@ -85,6 +85,8 @@ int main(){ // The socket created here deals with the control channel
 	int initial_max_fd = max_fd;
 
 	// Use "select" to allow multiple clients to connect with the control channel.
+
+	char connectMessage[] = "220 Service ready for new user.";
 	
 	while (1){
 		ready_fdset = full_fdset;
@@ -135,7 +137,10 @@ int main(){ // The socket created here deals with the control channel
 
 					state[state_index].client_sd = client_sd;
 
-					// We have an auto-login for testing
+					write(client_sd, connectMessage, strlen(connectMessage));
+					
+
+					// We have an auto-login for testing:
 
 					// strcpy(state[state_index].user, "bob");
 					// state[state_index].authenticated = 1;
@@ -156,6 +161,8 @@ int main(){ // The socket created here deals with the control channel
 					{
 						printf("Closing connection to client\n");
 
+						write(fd, QUITOK, strlen(QUITOK));
+
 						resetState(&state[state_index]);
 
 						close(fd);
@@ -165,13 +172,18 @@ int main(){ // The socket created here deals with the control channel
 						continue;
 					}
 
-					int shouldSendData = selectCommand(buffer, BUFFER_SIZE, &state[state_index]); // The server needs to know whether to send a message
+					int length = 0;
+
+					char **input = splitString(buffer, BUFFER_SIZE, &length);
+					
+
+					int shouldSendData = selectCommand(input, length, &state[state_index]); // The server needs to know whether to send a message
 
 					if (!shouldSendData) continue;
-					
-					// send(fd, state[state_index].msg, MAX_MESSAGE_SIZE*sizeof(char), 0);
 
-					if (strcmp(state[state_index].msg, "") == 0) strcpy(state[state_index].msg, " ");
+					freeInputMemory(input);
+
+					if (strcmp(state[state_index].msg, "") == 0) strcpy(state[state_index].msg, " "); // Send a single space if response is empty
 
 					write(fd, state[state_index].msg, strlen(state[state_index].msg));
 
@@ -181,5 +193,6 @@ int main(){ // The socket created here deals with the control channel
 		}
 	}
 
+	free(users); // Free malloc
 	close(server_sd);
 }

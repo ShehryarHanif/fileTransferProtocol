@@ -19,12 +19,20 @@ b) Reading and disecting user input **
 c) Commands Modules (for ! commands) and Command Handler **
 
 Extra TODOs:
-- Free all malloc memory
-- Check all strtok
-- Should we just disallow any CWD with a "/"
---- realpath()
 - close ftp_client_connection properly alongside return statements
 - Remove strcpy(state->msg, ...) in the forking sections
+- CWD for client
+
+
+BUGS:
+- Sending -1 somewhere?
+- PORT when not authenticated ????
+- \n on !CWD wrong folder
+- CWD code??
+- STOR/RETR when file does not exist
+- LIST, PWD commands ignore extra params
+
+Documentation:
 - Size limit of INT is approximately 2 GB
 
 

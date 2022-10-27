@@ -6,13 +6,13 @@
 #include<unistd.h>
 #include<stdlib.h>
 
+#define DEBUG 0 // We can print debugging comments by choice
+#define BUFFER_SIZE 4096 // This is the maximum size of the message(s) on the control channel
+
 #include "globals.h"
 #include "client_state.h"
 #include "server_input.h"
 #include "client_commands.h"
-
-#define DEBUG 0 // We can print debugging comments by choice
-#define BUFFER_SIZE 4096 // This is the maximum size of the message(s) on the control channel
 
 // Code template from "rn3_simple_client.c" by Rohail Asim
 
@@ -64,7 +64,6 @@ int main()
         perror("connect");
         exit(-1);
     }
-	printf("Connected to server\n");
 	
 	char buffer[BUFFER_SIZE];
 
@@ -80,7 +79,14 @@ int main()
 
 	state.server_sd = server_sd;
 
+
+	// 
+	bzero(buffer, sizeof(buffer));
+	read(server_sd, buffer, sizeof(buffer));
+	printf("%s\n", buffer);
+
 	// Communicate with server continuously
+	
 
 	while (1) {
 		bzero(buffer, sizeof(buffer));
@@ -103,15 +109,16 @@ int main()
 
 		handleTransfer(input, length, &state);
 
-		if (strcmp(buffer, "QUIT!") == 0) break; // We have an exit command for a disconnecdting client
+		// if (strcmp(buffer, "QUIT!") == 0) break; // We have an exit command for a disconnecdting client
 
 		bzero(buffer,sizeof(buffer));
 
 		int recv_bytes = read(server_sd, buffer, sizeof(buffer));
 		
-		if(debug) printf("\n-------\nReceived Message: %s\nRecv Bytes: %d\n------\n", buffer, recv_bytes);
+		if(DEBUG) printf("\n-------\nReceived Message: %s\nRecv Bytes: %d\n------\n", buffer, recv_bytes);
+		printf("%s\n",buffer);
 
-		if(recv_bytes == 0) break; // Stop communicating if the server sends no bytes
+		if(recv_bytes == 0 || strcmp(buffer, QUITOK) == 0) break; // Stop communicating if the server sends no bytes
 	}
 
 	close(server_sd);

@@ -1,13 +1,13 @@
-a#include <dirent.h>
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
 #define MAX_TRIES 100
-#define FTP_ACCEPT_TIMEOUT 10
+#define FTP_ACCEPT_TIMEOUT 5
 
-int pwd(struct State *state) // Handle the "!PWD" command
+int pwd(int length, struct State *state) // Handle the "!PWD" command
 {
     if (length != 1){ // The user needs to enter just the "PWD" command
         printf("Invalid number of arguments");
@@ -78,7 +78,7 @@ int cwd(char **input, int length, struct State *state) // Handle the "!PWD" comm
     return 1;
 }
 
-int list(struct State *state){// Handle the "!LIST" command
+int list(int length, struct State *state){// Handle the "!LIST" command
     // Reference: https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
 
     if (length != 1){ // The user needs to enter just the "LIST" command
@@ -251,17 +251,19 @@ int port(struct State *state){ // Handle the "PORT" command
     socklen_t slen = sizeof(client_addr);
 
     int ftp_client_connection;
+    char buffer[4096];
 
     if ((ftp_client_connection = accept(ftp_connection, (struct sockaddr *)&client_addr, &slen)) < 0)
     {
         close(ftp_connection);
-
+        // Receive msg if available
+        bzero(buffer, sizeof(buffer));
+        read(state->server_sd, buffer, sizeof(buffer));
+        printf("%s\n", buffer);
         return 0;
     }
     if (DEBUG)
         printf("FTP CLIENT ADDRESS: %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-
-    char buffer[4096];
 
     bzero(buffer, sizeof(buffer));
 
@@ -285,20 +287,17 @@ int selectCommand(char **input, int length, struct State *state) // Handle user 
     }
     else if (strcmp(command, "!PWD") == 0)
     {
-        pwd(state);
+        pwd(length, state);
         return 0;
     }
     else if (strcmp(command, "!LIST") == 0)
     {
-        list(state);
+        list(length, state);
         return 0;
     }
     else if (strcmp(command, "LIST") == 0 || strcmp(command, "STOR") == 0 || strcmp(command, "RETR") == 0) // These are commands handled at the server side
     {
-        if (!port(state))
-            return 0;
-
-        return 1;
+        return port(state);
     }
     else
     {
@@ -353,6 +352,18 @@ int listServer(char **input, int length, struct State *state) // Handle the "LIS
     return 1;
 }
 
+int exists(const char *fname) // Check if a file exists: https://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c
+{
+    FILE *file;
+
+    if ((file = fopen(fname, "r"))){
+        fclose(file);
+        return 1;
+    }
+
+    return 0;
+}
+
 int stor(char **input, int length, struct State *state) // Handle the "STOR" command
 {
     if (state->ftp_client_connection == -1) // Check if the data connection is valid, that is a user is logged in and other stuff has happened
@@ -383,6 +394,10 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
         printf("File not found");
 
         send(state->server_sd, -1, sizeof(int), 0);
+
+        close(state->ftp_client_connection);
+
+        state->ftp_client_connection = -1;
 
         return 0;
     }
@@ -438,17 +453,6 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
     return 1;
 }
 
-int exists(const char *fname) // Check if a file exists: https://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c
-{
-    FILE *file;
-
-    if ((file = fopen(fname, "r"))){
-        fclose(file);
-        return 1;
-    }
-
-    return 0;
-}
 
 int retr(char **input, int length, struct State *state) // Handle the "RETR" command
 {
@@ -490,14 +494,6 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
 
     snprintf(tempFilePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, randomFileName);
 
-    if (DEBUG)
-        printf("C: File Path: %s\n", filePath);
-    if ((fptr = fopen(tempFilePath, "wb")) == NULL)
-    {
-        printf("File not found\n");
-        return 0;
-    }
-
     int recv_bytes;
     int file_length;
 
@@ -509,6 +505,29 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
         printf("D: ftp_connection\n");
 
     recv_bytes = recv(ftp_connection, &file_length, sizeof(int), 0);
+
+    if (recv_bytes < 0) {
+        close(state->ftp_client_connection);
+
+        state->ftp_client_connection = -1;
+
+        return 0;
+    }
+
+    if (DEBUG)
+        printf("C: File Path: %s\n", filePath);
+    if ((fptr = fopen(tempFilePath, "wb")) == NULL)
+    {
+        printf("File not found");
+
+        // send(state->server_sd, -1, sizeof(int), 0);
+
+        close(state->ftp_client_connection);
+
+        state->ftp_client_connection = -1;
+
+        return 0;
+    }
 
     // We will get the file packet by packet and will write to the file stream
 
