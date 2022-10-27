@@ -3,19 +3,19 @@
 #define MAX_USER_SIZE 33
 #define MAX_IPADDRSTR_SIZE 15
 
+// Each state represents details for each user, especially with regards to their control channel
 struct State {
-    char pwd[MAX_LINUX_DIR_SIZE]; // present working directory
+    char pwd[MAX_LINUX_DIR_SIZE];
     char user[MAX_USER_SIZE];
     char msg[MAX_MESSAGE_SIZE];
-    int authenticated; // 1 if authenticated; 0 otherwise
+    int authenticated;
     int client_sd;
     int ftp_client_connection;
 };
 
-struct State state[MAX_CLIENTS];
+struct State state[MAX_CLIENTS]; // This array stores the clients' states based on a globally defined maximum number of clients
 
-void resetState(struct State* state)
-{
+void resetState(struct State* state){ // Reset the state for an individual user (e.g., if they disconnect)
     bzero(state->pwd, MAX_LINUX_DIR_SIZE*sizeof(char));
     bzero(state->user, MAX_USER_SIZE*sizeof(char));
     bzero(state->msg, MAX_MESSAGE_SIZE*sizeof(char));
