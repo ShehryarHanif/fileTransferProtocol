@@ -6,7 +6,7 @@
 #include<unistd.h>
 #include<stdlib.h>
 
-#define DEBUG 0 // We can print debugging comments by choice
+#define DEBUG 1 // We can print debugging comments by choice
 #define BUFFER_SIZE 4096 // This is the maximum size of the message(s) on the control channel
 
 #include "globals.h"
@@ -36,7 +36,7 @@ int main()
 	server_addr.sin_port = htons(CONTROL_PORT);
 	server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-	struct State state = {"", "", -1, -1, 1}; // The state tracks the client's information for the server
+	struct State state = {"", "", -1, -1, 1, -1}; // The state tracks the client's information for the server
 
 	if(!initializePWD(&state)){ // Initialize the present working directory as the location in the client folder
 		perror("Could not initialize state");

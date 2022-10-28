@@ -6,14 +6,14 @@ int user(char **input, int length, struct State *state) // Handle the "USER" com
 {
     if (length != 2)
     { // You must give the "USER" command and a username
-        strcat(state->msg, "501 Syntax error in parameters or arguments.");
+        strcpy(state->msg, "501 Syntax error in parameters or arguments.");
 
         return 0;
     }
 
     if (!verifyUserExists(input[1]))
     { // A user has to exist to be logged in
-        strcat(state->msg, "530 Not logged in.");
+        strcpy(state->msg, "530 Not logged in.");
         return 0;
     }
 
@@ -55,12 +55,16 @@ int pass(char **input, int length, struct State *state) // Handle the "PASS" com
 
         return 0;
     }
+    
 
     state->authenticated = 1; // Authenticate the user
 
     // A folder is created for a user if it does not exist
 
-    strcpy(state->pwd, state->user);
+    char* result = getcwd(state->pwd, (MAX_LINUX_DIR_SIZE-2)*sizeof(char));
+    strcat(state->pwd, "/");
+
+    strcat(state->pwd, state->user);
 
     strcat(state->pwd, "/");
 
@@ -77,7 +81,6 @@ int list(char **input, int length, struct State *state)
 
     if (length != 1)
     { // You must give the "RETR" command and a file
-        // strcpy(state->msg, "Invalid number of arguments");
         char msg[] = "501 Syntax error in parameters or arguments.";
         send(state->client_sd, msg, strlen(msg), 0);
         if (state->ftp_client_connection != -1)
@@ -97,7 +100,6 @@ int list(char **input, int length, struct State *state)
     if (d)
     {
         // Ignore the ever-present "." and ".." directories
-
         dir = readdir(d);
         dir = readdir(d);
 
@@ -113,6 +115,8 @@ int list(char **input, int length, struct State *state)
             send(state->ftp_client_connection, &size, sizeof(int), 0);
             send(state->ftp_client_connection, state->msg, strlen(state->msg), 0);
         }
+
+        bzero(state->msg, sizeof(state->msg));
 
         int falseFlag = 0;
 
@@ -139,6 +143,12 @@ int list(char **input, int length, struct State *state)
 
 int pwd(char **input, int length, struct State *state)
 { // Handle the "PWD" command
+    if (length != 1)
+    { // The user needs to enter just the "PWD" command
+        char msg[] = "501 Syntax error in parameters or arguments.";
+        send(state->client_sd, msg, strlen(msg), 0);
+        return 0;
+    }
     snprintf(state->msg, MAX_MESSAGE_SIZE, "257 %s", state->pwd);
 
     return 1;
@@ -209,10 +219,19 @@ int cwd(char **input, int length, struct State *state)
 
 int openDataConnection(char *address, int length, struct State *state)
 { // Handle the creation of the data channel with the "PORT" command
+    if (DEBUG) printf("openDataConnection: Starting...\n");
+    if (DEBUG) printf("Address: %s\n", address);
+    if (length != 2)
+    {
+        strcpy(state->msg, "501 Syntax error in parameters or arguments.");
+        return 0;
+    }
+
     int ftp_connection = socket(AF_INET, SOCK_STREAM, 0);
 
     int value = 1;
 
+    if (DEBUG) printf("openDataConnection: Setting reuse...");
     if (setsockopt(ftp_connection, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(int)) < 0)
     {
         perror("setsockopt failed"); // TODO
@@ -222,8 +241,7 @@ int openDataConnection(char *address, int length, struct State *state)
     if (ftp_connection < 0)
     {
         perror("socket"); // TODO
-
-        exit(-1);
+        return 0;
     }
 
     // Address of server
@@ -247,31 +265,12 @@ int openDataConnection(char *address, int length, struct State *state)
     int h1, h2, h3, h4, p1, p2;
 
     char ipaddr[MAX_IPADDRSTR_SIZE];
-
+    if (DEBUG) printf("Address: %s\n", address);
     sscanf(address, "%d,%d,%d,%d,%d,%d", &h1, &h2, &h3, &h4, &p1, &p2);
 
-    int port = p1 * 256 + p2;
+    state->ftp_port = p1 * 256 + p2;
 
-    snprintf(ipaddr, MAX_IPADDRSTR_SIZE, "%d.%d.%d.%d", h1, h2, h3, h4);
-
-    struct sockaddr_in ftp_connection_client_addr;
-
-    bzero(&ftp_connection_client_addr, sizeof(ftp_connection_client_addr));
-
-    ftp_connection_client_addr.sin_family = AF_INET;
-    ftp_connection_client_addr.sin_port = htons(port);
-    ftp_connection_client_addr.sin_addr.s_addr = inet_addr(ipaddr);
-
-    // printf("Connecting on address: %s:%d\n", ipaddr, port);
-
-    if (connect(ftp_connection, (struct sockaddr *)&ftp_connection_client_addr, sizeof(ftp_connection_client_addr)) < 0)
-    {
-        perror("connect");
-
-        strcpy(state->msg, "Could not establish FTP connection");
-
-        return 0;
-    }
+    snprintf(state->ftp_ip_addr, MAX_IPADDRSTR_SIZE, "%d.%d.%d.%d", h1, h2, h3, h4);
 
     char PORTOK[] = "200 PORT command successful";
 
@@ -282,27 +281,29 @@ int openDataConnection(char *address, int length, struct State *state)
     return 1;
 }
 
-void copyFile(const char* originalFileName, const char* newFileName){ // Create a copy of a file
-   FILE *source, *target;
- 
-   source = fopen(originalFileName, "rb");
-  
-   target = fopen(newFileName, "wb");
+void copyFile(const char *originalFileName, const char *newFileName)
+{ // Create a copy of a file
+    FILE *source, *target;
 
-   char ch;
- 
-   while((ch = fgetc(source)) != EOF)
-      fputc(ch, target);
-  
-   fclose(source);
-   fclose(target);
+    source = fopen(originalFileName, "rb");
+
+    target = fopen(newFileName, "wb");
+
+    char ch;
+
+    while ((ch = fgetc(source)) != EOF)
+        fputc(ch, target);
+
+    fclose(source);
+    fclose(target);
 }
 
 int exists(const char *fname) // Check if a file exists: https://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c
 {
     FILE *file;
 
-    if ((file = fopen(fname, "r"))){
+    if ((file = fopen(fname, "r")))
+    {
         fclose(file);
         return 1;
     }
@@ -315,22 +316,47 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
     if (DEBUG)
         printf("A\n");
 
-    if (state->ftp_client_connection == -1) // Check if the data connection is valid, that is a user is logged in and other stuff has happened
+    if (state->ftp_client_connection == -1 || state->ftp_port == -1) // Check if the data connection is valid, that is a user is logged in and other stuff has happened
     {
+        if (DEBUG) printf("No FTP Connection established!\n");
         char msg[] = "503 Bad sequence of commands.";
         send(state->client_sd, msg, strlen(msg), 0);
         return 0;
     }
     else if (length != 2)
     { // You must give the "STOR" command and a file
-        // strcpy(state->msg, "Invalid number of arguments");
         char msg[] = "501 Syntax error in parameters or arguments.";
         send(state->client_sd, msg, strlen(msg), 0);
-        if (state->ftp_client_connection != -1)
-        {
-            close(state->ftp_client_connection);
-            state->ftp_client_connection = -1;
-        }
+        close(state->ftp_client_connection);
+
+        state->ftp_port = -1;
+        bzero(state->ftp_ip_addr, sizeof(state->ftp_ip_addr));
+        state->ftp_client_connection = -1;
+
+        return 0;
+    }
+
+    struct sockaddr_in ftp_connection_client_addr;
+
+    bzero(&ftp_connection_client_addr, sizeof(ftp_connection_client_addr));
+
+    ftp_connection_client_addr.sin_family = AF_INET;
+    ftp_connection_client_addr.sin_port = htons(state->ftp_port);
+    ftp_connection_client_addr.sin_addr.s_addr = inet_addr(state->ftp_ip_addr);
+
+    // printf("Connecting on address: %s:%d\n", ipaddr, port);
+    int ftp_connection = state->ftp_client_connection;
+    
+    char msg[] = "150 File status okay; about to open data connection.";
+    send(state->client_sd, msg, strlen(msg), 0);
+
+    if (connect(ftp_connection, (struct sockaddr *)&ftp_connection_client_addr, sizeof(ftp_connection_client_addr)) < 0)
+    {
+        perror("connect");
+
+        char msg[] = "Could not establish FTP connection.";
+        send(state->client_sd, msg, strlen(msg), 0);
+
         return 0;
     }
 
@@ -344,17 +370,16 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
 
     if (!exists(filePath))
     {
-        // strcpy(state->msg, "550 No such file or directory.");
-
         char msg[] = "550 No such file or directory.";
 
         send(state->client_sd, msg, strlen(msg), 0);
-        
-        close(state->ftp_client_connection);
 
+        state->ftp_port = -1;
+        bzero(state->ftp_ip_addr, sizeof(state->ftp_ip_addr));
+        close(state->ftp_client_connection);
+        state->ftp_client_connection = -1;
         return 0;
     }
-    
 
     char tempFilePath[MAX_LINUX_DIR_SIZE];
 
@@ -387,7 +412,12 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
         printf("550 No such file or directory.\n");
         char msg[] = "550 No such file or directory.";
         send(state->client_sd, msg, strlen(msg), 0);
+
+        state->ftp_port = -1;
+        bzero(state->ftp_ip_addr, sizeof(state->ftp_ip_addr));
         close(state->ftp_client_connection);
+        state->ftp_client_connection = -1;
+
         return 0;
     }
 
@@ -395,7 +425,6 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
 
     int file_length;
 
-    int ftp_connection = state->ftp_client_connection;
 
     if (DEBUG)
         printf("D: ftp_connection Starting...\n");
@@ -466,10 +495,11 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
 
 int retr(char **input, int length, struct State *state) // Handle the "RETR" command
 {
-    
-    if (state->ftp_client_connection == -1) // Check if the data connection is valid, that is a user is logged in and other stuff has happened
+    if (DEBUG) printf("Starting retr....\n");
+    if (state->ftp_client_connection == -1 || state->ftp_port == -1) // Check if the data connection is valid, that is a user is logged in and other stuff has happened
     {
         // strcpy(state->msg, "503 Bad sequence of commands.");
+        if (DEBUG) printf("No FTP Connection established!\n");
         char msg[] = "503 Bad sequence of commands.";
         send(state->client_sd, msg, strlen(msg), 0);
         return 0;
@@ -477,11 +507,43 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
     else if (length != 2)
     { // You must give the "RETR" command and a file
         // strcpy(state->msg, "Invalid number of arguments");
+        if (DEBUG) printf("Error in parameters!\n");
         char msg[] = "501 Syntax error in parameters or arguments.";
         send(state->client_sd, msg, strlen(msg), 0);
+        close(state->ftp_client_connection);
+        
+        state->ftp_port = -1;
+        bzero(state->ftp_ip_addr, sizeof(state->ftp_ip_addr));
         state->ftp_client_connection = -1;
+
         return 0;
     }
+
+    struct sockaddr_in ftp_connection_client_addr;
+
+    bzero(&ftp_connection_client_addr, sizeof(ftp_connection_client_addr));
+
+    ftp_connection_client_addr.sin_family = AF_INET;
+    ftp_connection_client_addr.sin_port = htons(state->ftp_port);
+    ftp_connection_client_addr.sin_addr.s_addr = inet_addr(state->ftp_ip_addr);
+
+    // printf("Connecting on address: %s:%d\n", ipaddr, port);
+    int ftp_connection = state->ftp_client_connection;
+    
+    char msg[] = "150 File status okay; about to open data connection.";
+    send(state->client_sd, msg, strlen(msg), 0);
+
+    if (connect(ftp_connection, (struct sockaddr *)&ftp_connection_client_addr, sizeof(ftp_connection_client_addr)) < 0)
+    {
+        perror("connect");
+
+        char msg[] = "Could not establish FTP connection.";
+        send(state->client_sd, msg, strlen(msg), 0);
+
+        return 0;
+    }
+
+    if (DEBUG) printf("retr: Finished error checking!\n");
 
     // See if a file exists and if it does, open and write to it
 
@@ -489,32 +551,41 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
 
     char filePath[MAX_LINUX_DIR_SIZE];
 
-    snprintf(filePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, fileName);
+    snprintf(filePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, input[1]);
 
     FILE *fptr;
 
-    if (!exists(filePath))
+    if (DEBUG) printf("retr: Checking if file `%s` exists...\n", filePath);
+    if ((fptr = fopen(filePath, "rb")) == NULL)
     {
         // strcpy(state->msg, "550 No such file or directory.");
+        if (DEBUG) printf("File does not exist!");
 
         char msg[] = "550 No such file or directory.";
 
         send(state->client_sd, msg, strlen(msg), 0);
-        
+
+        state->ftp_port = -1;
+        bzero(state->ftp_ip_addr, sizeof(state->ftp_ip_addr));
         close(state->ftp_client_connection);
+        state->ftp_client_connection = -1;
 
         return 0;
     }
 
+    if (DEBUG) printf("retr: Checked if file exists!\n");
+
     // We will get the file packet by packet and will write to the file stream, but only after sending the length of the file
 
-    int ftp_connection = state->ftp_client_connection;
+    if (DEBUG) printf("retr: Sending data on connection %d\n", ftp_connection);
 
     fseek(fptr, 0, SEEK_END);
 
     int file_length = ftell(fptr);
 
+    if (DEBUG) printf("Sending length %d...", file_length);
     send(ftp_connection, &file_length, sizeof(int), 0);
+    if (DEBUG) printf("Sent!\n");
 
     fseek(fptr, 0, SEEK_SET);
 
@@ -589,11 +660,11 @@ int selectCommand(char **input, int length, struct State *state)
     }
     else if (!(state->authenticated)) // Non-authentication will not allow certain commands
     {
-        if (strcmp(command, "PORT") == 0)
-        {
-            recv(state->client_sd, state->msg, sizeof(state->msg), 0);
-            bzero(state->msg, sizeof(state->msg));
-        }
+        // if (strcmp(command, "PORT") == 0)
+        // {
+        //     // recv(state->client_sd, state->msg, sizeof(state->msg), 0);
+        //     bzero(state->msg, sizeof(state->msg));
+        // }
         strcat(state->msg, "530 Not logged in.");
 
         return 1;
@@ -602,7 +673,7 @@ int selectCommand(char **input, int length, struct State *state)
     {
         if (!openDataConnection(input[1], length, state))
         {
-            strcpy(state->msg, "200 PORT command successful");
+            strcpy(state->msg, "425 Can't open data connection.");
         }
 
         return 1;

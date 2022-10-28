@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define DEBUG 0 // We can print debugging comments by choice
+#define DEBUG 1 // We can print debugging comments by choice
 #define MAX_CLIENTS 5 // We have a global variable controlling the maximum number of possible clients
 #define BUFFER_SIZE 4096 // This is the maximum size of the message(s) on the control channel
 

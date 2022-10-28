@@ -9,8 +9,9 @@
 
 int pwd(int length, struct State *state) // Handle the "!PWD" command
 {
-    if (length != 1){ // The user needs to enter just the "PWD" command
-        printf("Invalid number of arguments");
+    if (length != 1)
+    { // The user needs to enter just the "PWD" command
+        printf("Invalid number of arguments\n");
 
         return 0;
     }
@@ -37,8 +38,9 @@ int goBackFolder(char newPWD[MAX_LINUX_DIR_SIZE]) // If the argument of cwd is "
 
 int cwd(char **input, int length, struct State *state) // Handle the "!PWD" command
 {
-    if (length != 2){ // The user needs to enter the "!CWD" command and the folder name
-        printf("Invalid number of arguments");
+    if (length != 2)
+    { // The user needs to enter the "!CWD" command and the folder name
+        printf("Invalid number of arguments\n");
 
         return 0;
     }
@@ -67,22 +69,24 @@ int cwd(char **input, int length, struct State *state) // Handle the "!PWD" comm
     if (!d)
     {
         // given folder does not exist
-        printf("404 Not Found"); // TODO
+        printf("Folder not found\n"); // TODO
         return 0;
     }
 
     bzero(state->pwd, sizeof(state->pwd));
 
     strcpy(state->pwd, newPWD);
-    
+
     return 1;
 }
 
-int list(int length, struct State *state){// Handle the "!LIST" command
+int list(int length, struct State *state)
+{ // Handle the "!LIST" command
     // Reference: https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
 
-    if (length != 1){ // The user needs to enter just the "LIST" command
-        printf("Invalid number of arguments");
+    if (length != 1)
+    { // The user needs to enter just the "LIST" command
+        printf("Invalid number of arguments\n");
 
         return 0;
     }
@@ -92,7 +96,7 @@ int list(int length, struct State *state){// Handle the "!LIST" command
     struct dirent *dir;
 
     d = opendir(state->pwd);
-    
+
     if (d)
     {
         // Ignore the ever-present "." and ".." directories
@@ -110,14 +114,15 @@ int list(int length, struct State *state){// Handle the "!LIST" command
     else
     {
         printf("Folder does not exist\n");
-     
+
         return 0;
     }
 
     return 1;
 }
 
-int create_socket(struct State *state, int *port, int *ftp_connection){ // Handle the creation of the data channel's socket
+int create_socket(struct State *state, int *port, int *ftp_connection)
+{ // Handle the creation of the data channel's socket
     if (DEBUG)
         printf("PORT: Creating Socket...\n");
 
@@ -130,7 +135,7 @@ int create_socket(struct State *state, int *port, int *ftp_connection){ // Handl
     if (setsockopt(*ftp_connection, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(int)) < 0)
     {
         perror("setsockopt failed");
-        
+
         return 0;
     }
 
@@ -172,7 +177,7 @@ int create_socket(struct State *state, int *port, int *ftp_connection){ // Handl
 
         if (DEBUG)
             printf("Errno Numbers: %d\n", errno);
-            
+
         if (errno == EADDRINUSE || errno == EADDRNOTAVAIL || errno == EACCES)
         {
             base_port = ((initial_base_port - 1025 + state->displacement) % 64510) + 1025;
@@ -192,8 +197,8 @@ int create_socket(struct State *state, int *port, int *ftp_connection){ // Handl
 
     if (tries == MAX_TRIES) // We limit the maximum number of ports that can be used by a client
     {
-        printf("Range of ports allocated for client are not all not available");
-        
+        printf("Range of ports allocated for client are not all not available\n");
+
         return 0;
     }
 
@@ -214,7 +219,8 @@ int create_socket(struct State *state, int *port, int *ftp_connection){ // Handl
     return 1;
 }
 
-int port(struct State *state){ // Handle the "PORT" command
+int port(struct State *state)
+{ // Handle the "PORT" command
     int port = 0;
 
     int ftp_connection = 0;
@@ -242,36 +248,61 @@ int port(struct State *state){ // Handle the "PORT" command
 
     snprintf(portCommand, 30, "PORT %s,%s,%s,%s,%d,%d", h1, h2, h3, h4, p1, p2);
 
-    printf("Command: %s\n", portCommand);
+    if (DEBUG)
+        printf("Command: %s\n", portCommand);
 
     send(state->server_sd, portCommand, strlen(portCommand), 0);
+
+    char buffer[4096];
+    bzero(buffer, sizeof(buffer));
+
+    int recv_bytes = read(state->server_sd, buffer, sizeof(buffer));
+
+    printf("%s\n", buffer);
+
+    if (strncmp(buffer, "200", 3) != 0) return 0;
+
+    state->ftp_connection = ftp_connection;
+
+    return 1;
+}
+
+int acceptDataConnection(struct State* state){
+
+    if (state->ftp_connection == -1) 
+    {
+        printf("Cannot accept data connection without opening one first\n");
+        return 0;
+    }
+
+    char buffer[4096];
+    bzero(buffer, sizeof(buffer));
+
+    int recv_bytes = read(state->server_sd, buffer, sizeof(buffer));
+    printf("%s\n", buffer);
+    if (strncmp(buffer, "150", 3) != 0) return 0;
+
 
     struct sockaddr_in client_addr;
 
     socklen_t slen = sizeof(client_addr);
 
     int ftp_client_connection;
-    char buffer[4096];
 
-    if ((ftp_client_connection = accept(ftp_connection, (struct sockaddr *)&client_addr, &slen)) < 0)
+    if ((ftp_client_connection = accept(state->ftp_connection, (struct sockaddr *)&client_addr, &slen)) < 0)
     {
-        close(ftp_connection);
+        close(state->ftp_connection);
         // Receive msg if available
-        bzero(buffer, sizeof(buffer));
-        read(state->server_sd, buffer, sizeof(buffer));
-        printf("%s\n", buffer);
         return 0;
     }
     if (DEBUG)
         printf("FTP CLIENT ADDRESS: %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-
-    bzero(buffer, sizeof(buffer));
-
-    int recv_bytes = read(state->server_sd, buffer, sizeof(buffer));
+    
 
     state->ftp_client_connection = ftp_client_connection;
 
-    close(ftp_connection);
+    close(state->ftp_connection);
+    state->ftp_connection = -1;
 
     return 1;
 }
@@ -302,8 +333,6 @@ int selectCommand(char **input, int length, struct State *state) // Handle user 
     else
     {
         return 1;
-
-        printf("Invalid Local Command\n");
     }
 }
 
@@ -333,7 +362,7 @@ int listServer(char **input, int length, struct State *state) // Handle the "LIS
 
     int stringLength;
 
-    while(((recv_bytes = recv(ftp_connection, &stringLength, sizeof(int), 0)) > 0) && (stringLength != 0))
+    while (((recv_bytes = recv(ftp_connection, &stringLength, sizeof(int), 0)) > 0) && (stringLength != 0))
     {
         bzero(buffer, PACKET_SIZE);
 
@@ -356,7 +385,8 @@ int exists(const char *fname) // Check if a file exists: https://stackoverflow.c
 {
     FILE *file;
 
-    if ((file = fopen(fname, "r"))){
+    if ((file = fopen(fname, "r")))
+    {
         fclose(file);
         return 1;
     }
@@ -368,18 +398,20 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
 {
     if (state->ftp_client_connection == -1) // Check if the data connection is valid, that is a user is logged in and other stuff has happened
     {
-        printf("FTP Connection not established");
+        printf("FTP Connection not established\n");
 
         return 0;
-    } else if (length != 2){ // You must give the "STOR" command and a file
-        printf("Invalid number of arguments");
+    }
+    else if (length != 2)
+    { // You must give the "STOR" command and a file
+        // printf("Invalid number of arguments\n");
 
         close(state->ftp_client_connection);
 
         return 0;
     }
 
-    // Read the file from the user's end and send it to the server 
+    // Read the file from the user's end and send it to the server
 
     char *fileName = input[1];
 
@@ -391,7 +423,7 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
 
     if ((fptr = fopen(filePath, "rb")) == NULL)
     {
-        printf("File not found");
+        printf("File not found\n");
 
         send(state->server_sd, -1, sizeof(int), 0);
 
@@ -405,7 +437,7 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
     int ftp_connection = state->ftp_client_connection;
 
     fseek(fptr, 0, SEEK_END);
-    
+
     int file_length = ftell(fptr);
 
     send(ftp_connection, &file_length, sizeof(int), 0);
@@ -452,7 +484,6 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
     fclose(fptr);
     return 1;
 }
-
 
 int retr(char **input, int length, struct State *state) // Handle the "RETR" command
 {
@@ -506,7 +537,8 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
 
     recv_bytes = recv(ftp_connection, &file_length, sizeof(int), 0);
 
-    if (recv_bytes < 0) {
+    if (recv_bytes < 0)
+    {
         close(state->ftp_client_connection);
 
         state->ftp_client_connection = -1;
@@ -518,7 +550,7 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
         printf("C: File Path: %s\n", filePath);
     if ((fptr = fopen(tempFilePath, "wb")) == NULL)
     {
-        printf("File not found");
+        printf("File not found\n");
 
         // send(state->server_sd, -1, sizeof(int), 0);
 
@@ -573,7 +605,7 @@ int retr(char **input, int length, struct State *state) // Handle the "RETR" com
     rename(tempFilePath, filePath);
 
     if (DEBUG)
-        printf("E");
+        printf("E\n");
     close(ftp_connection);
     fclose(fptr);
     return 1;
@@ -585,22 +617,25 @@ int handleTransfer(char **input, int length, struct State *state) // Handle the 
 
     if (strcmp(command, "STOR") == 0)
     {
+        if (!acceptDataConnection(state)) return 1;
         stor(input, length, state);
 
         return 1;
     }
     else if (strcmp(command, "RETR") == 0)
     {
+        if (!acceptDataConnection(state)) return 1;
         retr(input, length, state);
 
         return 1;
     }
     else if (strcmp(command, "LIST") == 0)
     {
+        if (!acceptDataConnection(state)) return 1;
         listServer(input, length, state);
 
         return 1;
     }
-    
+
     return 1;
 }

@@ -10,6 +10,8 @@ struct State {
     char msg[MAX_MESSAGE_SIZE];
     int authenticated;
     int client_sd;
+    int ftp_port;
+    char ftp_ip_addr[MAX_IPADDRSTR_SIZE];
     int ftp_client_connection;
 };
 
@@ -19,7 +21,9 @@ void resetState(struct State* state){ // Reset the state for an individual user 
     bzero(state->pwd, MAX_LINUX_DIR_SIZE*sizeof(char));
     bzero(state->user, MAX_USER_SIZE*sizeof(char));
     bzero(state->msg, MAX_MESSAGE_SIZE*sizeof(char));
+    bzero(state->ftp_ip_addr, MAX_IPADDRSTR_SIZE*sizeof(char));
     state->authenticated = 0;
     state->client_sd = -1;
     state->ftp_client_connection = -1;
+    state->ftp_port = -1;
 }

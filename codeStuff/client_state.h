@@ -8,10 +8,11 @@ struct State {
     int server_sd;
     int displacement;
     int ftp_client_connection;
+    int ftp_connection;
 };
 
-int initializePWD(struct State* state){
-
+int initializePWD(struct State* state)
+{
     char* result = getcwd(state->pwd, (MAX_LINUX_DIR_SIZE-2)*sizeof(char));
     strcat(state->pwd, "/");
     if (!result) return 0;
