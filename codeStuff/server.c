@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define DEBUG 1 // We can print debugging comments by choice
+#define DEBUG 0 // We can print debugging comments by choice
 #define MAX_CLIENTS 5 // We have a global variable controlling the maximum number of possible clients
 #define BUFFER_SIZE 4096 // This is the maximum size of the message(s) on the control channel
 
@@ -157,7 +157,7 @@ int main(){ // The socket created here deals with the control channel
 
 					int recv_bytes = recv(fd, buffer, BUFFER_SIZE, 0);
 
-					if (recv_bytes == 0 || strcmp(buffer, "QUIT!") == 0)
+					if (recv_bytes == 0 || strcmp(buffer, "QUIT") == 0)
 					{
 						printf("Closing connection to client\n");
 

@@ -78,16 +78,45 @@ int pass(char **input, int length, struct State *state) // Handle the "PASS" com
 int list(char **input, int length, struct State *state)
 { // Handle the "LIST" command
     // Reference: https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
-
-    if (length != 1)
+    if (state->ftp_client_connection == -1 || state->ftp_port == -1){
+        char msg[] = "503 Bad sequence of commands.";
+        send(state->client_sd, msg, strlen(msg), 0);
+        return 0;
+    }
+    else if (length != 1)
     { // You must give the "RETR" command and a file
         char msg[] = "501 Syntax error in parameters or arguments.";
         send(state->client_sd, msg, strlen(msg), 0);
-        if (state->ftp_client_connection != -1)
-        {
-            close(state->ftp_client_connection);
-            state->ftp_client_connection = -1;
-        }
+        close(state->ftp_client_connection);
+
+        state->ftp_port = -1;
+        bzero(state->ftp_ip_addr, sizeof(state->ftp_ip_addr));
+        state->ftp_client_connection = -1;
+
+        return 0;
+    }
+
+    struct sockaddr_in ftp_connection_client_addr;
+
+    bzero(&ftp_connection_client_addr, sizeof(ftp_connection_client_addr));
+
+    ftp_connection_client_addr.sin_family = AF_INET;
+    ftp_connection_client_addr.sin_port = htons(state->ftp_port);
+    ftp_connection_client_addr.sin_addr.s_addr = inet_addr(state->ftp_ip_addr);
+
+    // printf("Connecting on address: %s:%d\n", ipaddr, port);
+    int ftp_connection = state->ftp_client_connection;
+    
+    char msg[] = "150 File status okay; about to open data connection.";
+    send(state->client_sd, msg, strlen(msg), 0);
+
+    if (connect(ftp_connection, (struct sockaddr *)&ftp_connection_client_addr, sizeof(ftp_connection_client_addr)) < 0)
+    {
+        perror("connect");
+
+        char msg[] = "Could not establish FTP connection.";
+        send(state->client_sd, msg, strlen(msg), 0);
+
         return 0;
     }
 
@@ -122,7 +151,10 @@ int list(char **input, int length, struct State *state)
 
         send(state->ftp_client_connection, &falseFlag, sizeof(int), 0);
 
+        state->ftp_port = -1;
+        bzero(state->ftp_ip_addr, sizeof(state->ftp_ip_addr));
         close(state->ftp_client_connection);
+        state->ftp_client_connection = -1;
 
         closedir(d);
 
@@ -134,7 +166,10 @@ int list(char **input, int length, struct State *state)
     {
         char FILENOTFOUND[] = "550 No File or Directory.";
         send(state->client_sd, FILENOTFOUND, strlen(FILENOTFOUND), 0);
+        state->ftp_port = -1;
+        bzero(state->ftp_ip_addr, sizeof(state->ftp_ip_addr));
         close(state->ftp_client_connection);
+        state->ftp_client_connection = -1;
         return 0;
     }
 
@@ -368,7 +403,7 @@ int stor(char **input, int length, struct State *state) // Handle the "STOR" com
 
     snprintf(filePath, MAX_LINUX_DIR_SIZE, "%s%s", state->pwd, input[1]);
 
-    if (!exists(filePath))
+    if ((fptr = fopen(filePath, "wb")) == NULL)
     {
         char msg[] = "550 No such file or directory.";
 
